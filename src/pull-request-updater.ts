@@ -166,8 +166,7 @@ ${diffOutput}`;
       );
       throw error;
     }
-  }
-  Ï;
+  };
 
   async fetchPullRequestDetails(pullRequestNumber: number) {
     const { data } = await this.octokit.rest.pulls.get({
