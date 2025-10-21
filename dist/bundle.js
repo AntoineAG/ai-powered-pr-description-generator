@@ -23868,35 +23868,6 @@ var require_github = __commonJS({
 var import_core = __toESM(require_core());
 var import_github = __toESM(require_github());
 
-// src/git-helper.ts
-var import_child_process = require("child_process");
-var GitHelper = class {
-  ignores;
-  constructor(ignores) {
-    this.ignores = ignores;
-  }
-  setupGitConfiguration() {
-    (0, import_child_process.execSync)(`git config --global user.name "github-actions[bot]"`);
-    (0, import_child_process.execSync)(`git config --global user.email "github-actions[bot]@users.noreply.github.com"`);
-  }
-  fetchGitBranches(baseBranch, headBranch) {
-    (0, import_child_process.execSync)(`git fetch origin ${baseBranch} ${headBranch}`);
-  }
-  getGitDiff(baseBranch, headBranch) {
-    let ignoreFiles = [
-      ":!**/package-lock.json",
-      ":!**/dist/*"
-    ];
-    if (this.ignores) {
-      ignoreFiles = this.ignores.split(",").map((item) => `:!${item}`);
-    }
-    console.log("ignoreFiles = ", JSON.stringify(ignoreFiles));
-    const diffOutput = (0, import_child_process.execSync)(`git diff origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(" ")}`, { encoding: "utf8" });
-    console.log("Filtered diff output:", diffOutput);
-    return diffOutput;
-  }
-};
-
 // node_modules/@google/generative-ai/dist/index.mjs
 var SchemaType;
 (function(SchemaType2) {
@@ -24870,7 +24841,8 @@ var GeminiAIHelper = class {
     try {
       console.log("call gemini Ai");
       const genAI = new GoogleGenerativeAI(this.apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const modelName = this.geminiModel && this.geminiModel.trim().length > 0 ? this.geminiModel : "gemini-1.5-pro";
+      const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent({
         contents: [
           { role: "user", parts: [{ text: prompt }] },
@@ -24907,7 +24879,7 @@ var OpenAIHelper = class {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "gpt-4o",
+          model: this.openaiModel && this.openaiModel.trim().length > 0 ? this.openaiModel : "gpt-4.1",
           messages: [
             {
               role: "system",
@@ -24940,6 +24912,7 @@ var aiHelperResolver = (aiHelperParams) => {
   const { aiName } = aiHelperParams;
   switch (aiName) {
     case "open-ai":
+    case "openai":
       return new open_ai_helper_default(aiHelperParams);
     case "gemini":
     default:
@@ -24947,6 +24920,33 @@ var aiHelperResolver = (aiHelperParams) => {
   }
 };
 var ai_helper_resolver_default = aiHelperResolver;
+
+// src/git-helper.ts
+var import_child_process = require("child_process");
+var GitHelper = class {
+  ignores;
+  constructor(ignores) {
+    this.ignores = ignores;
+  }
+  setupGitConfiguration() {
+    (0, import_child_process.execSync)(`git config --global user.name "github-actions[bot]"`);
+    (0, import_child_process.execSync)(`git config --global user.email "github-actions[bot]@users.noreply.github.com"`);
+  }
+  fetchGitBranches(baseBranch, headBranch) {
+    (0, import_child_process.execSync)(`git fetch origin ${baseBranch} ${headBranch}`);
+  }
+  getGitDiff(baseBranch, headBranch) {
+    const defaultIgnoreFiles = [
+      ":!**/package-lock.json",
+      ":!**/dist/*"
+    ];
+    const ignoreFiles = this.ignores ? this.ignores.split(",").map((item) => `:!${item.trim()}`) : defaultIgnoreFiles;
+    console.log("Ignore files:", JSON.stringify(ignoreFiles));
+    const diffOutput = (0, import_child_process.execSync)(`git diff origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(" ")}`, { encoding: "utf8" });
+    console.log("Filtered diff output:", diffOutput);
+    return diffOutput;
+  }
+};
 
 // src/pull-request-updater.ts
 var PullRequestUpdater = class {
@@ -24960,27 +24960,30 @@ var PullRequestUpdater = class {
     this.aiHelper = ai_helper_resolver_default({
       apiKey: (0, import_core.getInput)("api_key", { required: true }),
       aiName: (0, import_core.getInput)("ai_name", { required: true }),
-      temperature: parseFloat((0, import_core.getInput)("temperature") || "0.8")
+      temperature: parseFloat((0, import_core.getInput)("temperature") || "0.8"),
+      geminiModel: (0, import_core.getInput)("gemini_model") || "gemini-1.5-pro",
+      openaiModel: (0, import_core.getInput)("openai_model") || "gpt-4.1"
     });
     const githubToken = (0, import_core.getInput)("github_token", { required: true });
     this.octokit = (0, import_github.getOctokit)(githubToken);
   }
   generatePrompt(diffOutput, creator) {
     return `Instructions:
-Please generate a Pull Request description for the provided diff, following these guidelines:
-- Add a subtitle "## What this PR do?" to the first line.
-- Format your answer in Markdown.
-- Do not include the title of the PR. e.g. "feat: xxx" "fix: xxx" "Refactor: xxx".
-- Do not include the diff in the PR description.
-- Describe the changes simply in the PR.
-- Do not include any code snippets or images.
-- Please add some emojis to make it more fun! Emojis only contain the following: \u{1F680}\u{1F389}\u{1F44D}\u{1F44F}\u{1F525}. List the changes using numbers, each list should only have 0 or 1 emoji. 
-  e.g. 1. Added a new feature\u{1F44F}, 2. Fixed a bug\u{1F44D}, 3. Made a big change for preact\u{1F680} etc. But do not exceed 3 emojis in your list!!!
-- 
-- Thanks to **${creator}** for the contribution! \u{1F389}
-
-Diff:
-${diffOutput}`;
+    Please generate a Pull Request description for the provided diff, following these guidelines:
+    - Start with a subtitle "## What this PR does?".
+    - Format your response in Markdown.
+    - Exclude the PR title (e.g., "feat: xxx", "fix: xxx", "Refactor: xxx").
+    - Do not include the diff in the PR description.
+    - Provide a simple description of the changes.
+    - Avoid code snippets or images.
+    - Add some fun with emojis! Use only the following: \u{1F680}\u{1F389}\u{1F44D}\u{1F44F}\u{1F525}. List changes using numbers, with a maximum of one emoji per item. Limit the total to 3 emojis. Example: 
+      1. Added a new feature\u{1F44F} 
+      2. Fixed a bug\u{1F44D} 
+      3. Major refactor\u{1F680}.
+    - Thank **${creator}** for the contribution! \u{1F389}
+  
+    Diff:
+    ${diffOutput}`;
   }
   async run() {
     try {
@@ -24989,21 +24992,26 @@ ${diffOutput}`;
       const creator = this.context.payload.pull_request.user.login;
       const { baseBranch, headBranch } = this.extractBranchRefs();
       this.gitHelper.setupGitConfiguration();
-      this.gitHelper.fetchGitBranches(baseBranch, headBranch);
+      await this.gitHelper.fetchGitBranches(baseBranch, headBranch);
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
       const prompt = this.generatePrompt(diffOutput, creator);
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
-      await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
+      await this.updatePullRequestDescription(
+        pullRequestNumber,
+        generatedDescription
+      );
       (0, import_core.setOutput)("pr_number", pullRequestNumber.toString());
       (0, import_core.setOutput)("description", generatedDescription);
       console.log(`Successfully updated PR #${pullRequestNumber} description.`);
     } catch (error) {
-      (0, import_core.setFailed)(error instanceof Error ? error.message : "Unknown error");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      (0, import_core.setFailed)(errorMessage);
+      console.error(`Error updating PR: ${errorMessage}`);
     }
   }
   validateEventContext() {
     if (this.context.eventName !== "pull_request") {
-      (0, import_core.setFailed)("This action only runs on pull_request events.");
+      (0, import_core.setFailed)("This action should only runs on pull_request events.");
       throw new Error("Invalid event context");
     }
   }
@@ -25019,14 +25027,24 @@ ${diffOutput}`;
       const pullRequest = await this.fetchPullRequestDetails(pullRequestNumber);
       const currentDescription = pullRequest.body || "";
       if (currentDescription) {
-        await this.postOriginalDescriptionComment(pullRequestNumber, currentDescription);
+        await this.postOriginalDescriptionComment(
+          pullRequestNumber,
+          currentDescription
+        );
       }
-      await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
+      await this.applyPullRequestUpdate(
+        pullRequestNumber,
+        generatedDescription
+      );
     } catch (error) {
-      console.error("Error in updatePullRequestDescription:", error);
+      console.error(
+        `Error updating PR #${pullRequestNumber} description:`,
+        error
+      );
       throw error;
     }
   }
+  \u00CF;
   async fetchPullRequestDetails(pullRequestNumber) {
     const { data } = await this.octokit.rest.pulls.get({
       owner: this.context.repo.owner,

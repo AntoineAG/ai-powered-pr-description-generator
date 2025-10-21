@@ -6,6 +6,7 @@ const aiHelperResolver = (aiHelperParams: AIHelperParams): AIHelperInterface => 
     const { aiName } = aiHelperParams;
     switch(aiName) {
         case 'open-ai':
+        case 'openai':
             return new OpenAIHelper(aiHelperParams);
         case 'gemini':
         default:

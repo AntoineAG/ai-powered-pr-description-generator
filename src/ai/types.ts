@@ -6,4 +6,6 @@ export interface AIHelperParams {
     aiName: string,
     apiKey: string,
     temperature: number,
+    geminiModel?: string,
+    openaiModel?: string,
 }

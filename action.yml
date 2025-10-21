@@ -9,6 +9,14 @@ inputs:
     description: 'The name of AI, currently just supports gemini, open-ai'
     required: true
     default: 'gemini'
+  gemini_model:
+    description: 'Gemini model to use (e.g., gemini-1.5-pro, gemini-1.5-flash, gemini-1.5-flash-8b). Defaults to gemini-1.5-pro.'
+    required: false
+    default: 'gemini-1.5-pro'
+  openai_model:
+    description: 'OpenAI model to use (e.g., gpt-4.1, gpt-4.1-mini). Defaults to gpt-4.1.'
+    required: false
+    default: 'gpt-4.1'
   api_key:
     description: 'API key for authenticating with Google Gemini service. Ensure it has the necessary permissions for generating content.'
     required: true

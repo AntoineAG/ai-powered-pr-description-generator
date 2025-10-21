@@ -54,12 +54,68 @@ Before using the generator, you need to configure the following secrets in your 
 
 GITHUB_TOKEN should be required (https://github.com/settings/tokens), it needs permission to modify the pull request.
 
+### Action Inputs
+- `ai_name` (required): Which provider to use. Supported: `gemini`, `open-ai`.
+- `api_key` (required): API key for the selected provider.
+- `temperature` (optional): Creativity (0.0–1.0). Default: `0.7`.
+- `ignores` (optional): Comma-separated paths to ignore in diffs.
+- `use_jira` (optional): Enable Jira ticket extraction from branch. Default: `false`.
+- `gemini_model` (optional): Gemini model to use. Default: `gemini-1.5-pro`. Examples: `gemini-2.5-flash` (recommended), `gemini-2.5-flash-lite`, `gemini-2.0-flash`, `gemini-1.5-pro`.
+- `openai_model` (optional): OpenAI model to use. Default: `gpt-4.1`. Examples: `gpt-4.1` (recommended), `gpt-4.1-mini`, `gpt-3.5-turbo` (legacy).
+
 
 ## Usage
 Once configured, the action will automatically execute whenever a pull request is created or a commit is pushed to the repository.
 
 ## GitHub Workflow
 Here's an example of how to set up your GitHub Actions workflow file (.github/workflows/description-generator.yml):
+
+```yaml
+name: PR Description
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  describe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate PR description (Gemini)
+        if: env.AI_PROVIDER == 'gemini'
+        uses: your-username/ai-powered-pr-description-generator@v1
+        with:
+          ai_name: gemini
+          api_key: ${{ secrets.GEMINI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          temperature: '0.7'
+          # Choose a Gemini model
+          gemini_model: gemini-2.5-flash
+          # Optional: ignore some paths
+          ignores: 'package-lock.json, dist/**'
+
+      - name: Generate PR description (OpenAI)
+        if: env.AI_PROVIDER == 'openai'
+        uses: your-username/ai-powered-pr-description-generator@v1
+        with:
+          ai_name: open-ai
+          api_key: ${{ secrets.OPENAI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          temperature: '0.7'
+          # Choose an OpenAI model
+          openai_model: gpt-4.1
+          ignores: 'package-lock.json, dist/**'
+```
+
+Tip: set provider and models at the top of your workflow via `env`:
+
+```yaml
+env:
+  AI_PROVIDER: gemini # or 'openai'
+  GEMINI_MODEL: gemini-2.5-flash
+  OPENAI_MODEL: gpt-4.1
+```
 
 ## Supported AI Models
 The project currently supports the following AI models for generating descriptions:

@@ -4,6 +4,7 @@ import { AIHelperInterface, AIHelperParams } from './types';
 class GeminiAIHelper implements AIHelperInterface {
   private apiKey: string;
   private temperature: number;
+  private geminiModel?: string;
 
     constructor(aiHelperParams: AIHelperParams) {
       Object.assign(this, aiHelperParams);
@@ -13,7 +14,10 @@ class GeminiAIHelper implements AIHelperInterface {
     try {
       console.log('call gemini Ai');
       const genAI = new GoogleGenerativeAI(this.apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const modelName = this.geminiModel && this.geminiModel.trim().length > 0
+        ? this.geminiModel
+        : "gemini-1.5-pro";
+      const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent({
         contents: [
           { role: "user", parts: [{ text: prompt }] },

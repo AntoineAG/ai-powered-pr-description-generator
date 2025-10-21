@@ -3,6 +3,7 @@ import { AIHelperInterface, AIHelperParams } from './types';
 class OpenAIHelper implements AIHelperInterface {
   private apiKey: string;
   private temperature: number;
+  private openaiModel?: string;
 
   constructor(aiHelperParams: AIHelperParams) {
     Object.assign(this, aiHelperParams);
@@ -18,7 +19,7 @@ class OpenAIHelper implements AIHelperInterface {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'gpt-4o',
+              model: (this.openaiModel && this.openaiModel.trim().length > 0) ? this.openaiModel : 'gpt-4.1',
               messages: [
                 {
                   role: 'system',
