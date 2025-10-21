@@ -24842,11 +24842,13 @@ var GeminiAIHelper = class {
       console.log("call gemini Ai");
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const modelName = this.geminiModel && this.geminiModel.trim().length > 0 ? this.geminiModel : "gemini-1.5-pro";
-      const model = genAI.getGenerativeModel({ model: modelName });
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: "You are very good at reviewing code and can generate pull request descriptions"
+      });
       const result = await model.generateContent({
         contents: [
-          { role: "user", parts: [{ text: prompt }] },
-          { role: "assistant", parts: [{ text: "You are very good at reviewing code and can generate pull request descriptions" }] }
+          { role: "user", parts: [{ text: prompt }] }
         ],
         generationConfig: {
           temperature: this.temperature,
