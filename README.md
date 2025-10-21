@@ -62,6 +62,7 @@ GITHUB_TOKEN should be required (https://github.com/settings/tokens), it needs p
 - `use_jira` (optional): Enable Jira ticket extraction from branch. Default: `false`.
 - `gemini_model` (optional): Gemini model to use. Default: `gemini-1.5-pro`. Examples: `gemini-2.5-flash` (recommended), `gemini-2.5-flash-lite`, `gemini-2.0-flash`, `gemini-1.5-pro`.
 - `openai_model` (optional): OpenAI model to use. Default: `gpt-4.1`. Examples: `gpt-4.1` (recommended), `gpt-4.1-mini`, `gpt-3.5-turbo` (legacy).
+- `update_title` (optional): When `true`, also generates and updates the PR title. Default: `false`.
 
 
 ## Usage
@@ -92,6 +93,8 @@ jobs:
           temperature: '0.7'
           # Choose a Gemini model
           gemini_model: gemini-2.5-flash
+          # Also update the PR title
+          update_title: 'true'
           # Optional: ignore some paths
           ignores: 'package-lock.json, dist/**'
 
@@ -105,6 +108,7 @@ jobs:
           temperature: '0.7'
           # Choose an OpenAI model
           openai_model: gpt-4.1
+          update_title: 'true'
           ignores: 'package-lock.json, dist/**'
 ```
 

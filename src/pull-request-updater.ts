@@ -9,6 +9,7 @@ class PullRequestUpdater {
   private context: any;
   private aiHelper: AIHelperInterface;
   private octokit: any;
+  private updateTitle: boolean;
 
   constructor() {
     this.gitHelper = new GitHelper(getInput("ignores"));
@@ -22,6 +23,7 @@ class PullRequestUpdater {
     });
     const githubToken = getInput("github_token", { required: true });
     this.octokit = getOctokit(githubToken);
+    this.updateTitle = (getInput("update_title") || '').toLowerCase() === 'true';
   }
 
   private generatePrompt(diffOutput: string, creator: string): string {
@@ -43,6 +45,32 @@ class PullRequestUpdater {
     ${diffOutput}`;
   }
 
+  private generateTitlePrompt(diffOutput: string, currentTitle: string): string {
+    return `You are helping write a precise, concise Pull Request title.
+
+Rules:
+- Output ONLY the title text, nothing else.
+- Use imperative mood, present tense.
+- 6-12 words, max 72 characters.
+- No emojis, no code fences, no quotes, no trailing punctuation.
+- Summarize the main changes from the diff. If the current title is already great, improve it slightly.
+
+Current title: ${currentTitle}
+
+Diff:
+${diffOutput}`;
+  }
+
+  private sanitizeTitle(title: string): string {
+    const cleaned = (title || '')
+      .replace(/^#+\s*/, '') // strip markdown heading
+      .replace(/^[`'"]+|[`'"]+$/g, '') // strip surrounding quotes/backticks
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/[\.!?]+$/g, ''); // strip trailing punctuation
+    return cleaned.length > 72 ? cleaned.slice(0, 72).trim() : cleaned;
+  }
+
   async run() {
     try {
       // Validate the event context
@@ -60,13 +88,22 @@ class PullRequestUpdater {
       // Get the diff and generate the PR description
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
       const prompt = this.generatePrompt(diffOutput, creator);
-      const generatedDescription =
-        await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
+      const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
+
+      // Optionally generate a new PR title
+      const currentTitle = this.context.payload.pull_request.title || '';
+      let generatedTitle: string | undefined;
+      if (this.updateTitle) {
+        const titlePrompt = this.generateTitlePrompt(diffOutput, currentTitle);
+        const rawTitle = await this.aiHelper.createPullRequestDescription(diffOutput, titlePrompt);
+        generatedTitle = this.sanitizeTitle(rawTitle);
+      }
 
       // Update the pull request description
       await this.updatePullRequestDescription(
         pullRequestNumber,
-        generatedDescription
+        generatedDescription,
+        generatedTitle
       );
 
       // Set outputs for GitHub Actions
@@ -99,7 +136,8 @@ class PullRequestUpdater {
 
   async updatePullRequestDescription(
     pullRequestNumber: number,
-    generatedDescription: string
+    generatedDescription: string,
+    generatedTitle?: string
   ) {
     try {
       // Fetch pull request details
@@ -117,7 +155,8 @@ class PullRequestUpdater {
       // Apply the new pull request description
       await this.applyPullRequestUpdate(
         pullRequestNumber,
-        generatedDescription
+        generatedDescription,
+        generatedTitle
       );
     } catch (error) {
       // Log the error and rethrow it for higher-level handling
@@ -161,15 +200,21 @@ class PullRequestUpdater {
 
   async applyPullRequestUpdate(
     pullRequestNumber: number,
-    newDescription: string
+    newDescription: string,
+    newTitle?: string
   ) {
     console.log("Updating PR description...");
-    await this.octokit.rest.pulls.update({
+    const params: any = {
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       pull_number: pullRequestNumber,
       body: newDescription,
-    });
+    };
+    if (newTitle && newTitle.length > 0) {
+      console.log(`Updating PR title to: "${newTitle}"`);
+      params.title = newTitle;
+    }
+    await this.octokit.rest.pulls.update(params);
     console.log("PR description updated successfully.");
   }
 }

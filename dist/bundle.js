@@ -24956,6 +24956,7 @@ var PullRequestUpdater = class {
   context;
   aiHelper;
   octokit;
+  updateTitle;
   constructor() {
     this.gitHelper = new GitHelper((0, import_core.getInput)("ignores"));
     this.context = import_github.context;
@@ -24968,6 +24969,7 @@ var PullRequestUpdater = class {
     });
     const githubToken = (0, import_core.getInput)("github_token", { required: true });
     this.octokit = (0, import_github.getOctokit)(githubToken);
+    this.updateTitle = ((0, import_core.getInput)("update_title") || "").toLowerCase() === "true";
   }
   generatePrompt(diffOutput, creator) {
     return `Instructions:
@@ -24987,6 +24989,25 @@ var PullRequestUpdater = class {
     Diff:
     ${diffOutput}`;
   }
+  generateTitlePrompt(diffOutput, currentTitle) {
+    return `You are helping write a precise, concise Pull Request title.
+
+Rules:
+- Output ONLY the title text, nothing else.
+- Use imperative mood, present tense.
+- 6-12 words, max 72 characters.
+- No emojis, no code fences, no quotes, no trailing punctuation.
+- Summarize the main changes from the diff. If the current title is already great, improve it slightly.
+
+Current title: ${currentTitle}
+
+Diff:
+${diffOutput}`;
+  }
+  sanitizeTitle(title) {
+    const cleaned = (title || "").replace(/^#+\s*/, "").replace(/^[`'\"]+|[`'\"]+$/g, "").trim().replace(/\s+/g, " ").replace(/[\.!?]+$/g, "");
+    return cleaned.length > 72 ? cleaned.slice(0, 72).trim() : cleaned;
+  }
   async run() {
     try {
       this.validateEventContext();
@@ -24998,9 +25019,17 @@ var PullRequestUpdater = class {
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
       const prompt = this.generatePrompt(diffOutput, creator);
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
+      const currentTitle = this.context.payload.pull_request.title || "";
+      let generatedTitle;
+      if (this.updateTitle) {
+        const titlePrompt = this.generateTitlePrompt(diffOutput, currentTitle);
+        const rawTitle = await this.aiHelper.createPullRequestDescription(diffOutput, titlePrompt);
+        generatedTitle = this.sanitizeTitle(rawTitle);
+      }
       await this.updatePullRequestDescription(
         pullRequestNumber,
-        generatedDescription
+        generatedDescription,
+        generatedTitle
       );
       (0, import_core.setOutput)("pr_number", pullRequestNumber.toString());
       (0, import_core.setOutput)("description", generatedDescription);
@@ -25024,7 +25053,7 @@ var PullRequestUpdater = class {
     console.log(`Head branch: ${headBranch}`);
     return { baseBranch, headBranch };
   }
-  async updatePullRequestDescription(pullRequestNumber, generatedDescription) {
+  async updatePullRequestDescription(pullRequestNumber, generatedDescription, generatedTitle) {
     try {
       const pullRequest = await this.fetchPullRequestDetails(pullRequestNumber);
       const currentDescription = pullRequest.body || "";
@@ -25036,7 +25065,8 @@ var PullRequestUpdater = class {
       }
       await this.applyPullRequestUpdate(
         pullRequestNumber,
-        generatedDescription
+        generatedDescription,
+        generatedTitle
       );
     } catch (error) {
       console.error(
@@ -25070,14 +25100,19 @@ ${currentDescription}`
     });
     console.log("Comment created successfully.");
   }
-  async applyPullRequestUpdate(pullRequestNumber, newDescription) {
+  async applyPullRequestUpdate(pullRequestNumber, newDescription, newTitle) {
     console.log("Updating PR description...");
-    await this.octokit.rest.pulls.update({
+    const params = {
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       pull_number: pullRequestNumber,
       body: newDescription
-    });
+    };
+    if (newTitle && newTitle.length > 0) {
+      console.log(`Updating PR title to: "${newTitle}"`);
+      params.title = newTitle;
+    }
+    await this.octokit.rest.pulls.update(params);
     console.log("PR description updated successfully.");
   }
 };
