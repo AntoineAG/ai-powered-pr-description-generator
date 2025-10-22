@@ -60,8 +60,9 @@ GITHUB_TOKEN should be required (https://github.com/settings/tokens), it needs p
 - `temperature` (optional): Creativity (0.0–1.0). Default: `0.7`.
 - `ignores` (optional): Comma-separated paths to ignore in diffs.
 - `use_jira` (optional): Enable Jira ticket extraction from branch. Default: `false`.
-- `gemini_model` (optional): Gemini model to use. Default: `gemini-1.5-pro`. Examples: `gemini-2.5-flash` (recommended), `gemini-2.5-flash-lite`, `gemini-2.0-flash`, `gemini-1.5-pro`.
-- `openai_model` (optional): OpenAI model to use. Default: `gpt-4.1`. Examples: `gpt-4.1` (recommended), `gpt-4.1-mini`, `gpt-3.5-turbo` (legacy).
+- `ai_model` (optional): Model to use. Default depends on `ai_name`:
+  - `gemini` -> `gemini-1.5-pro` (e.g., `gemini-2.5-flash`, `gemini-2.5-flash-lite`)
+  - `open-ai` -> `gpt-4.1` (e.g., `gpt-4.1`, `gpt-4.1-mini`)
 - `update_title` (optional): When `true`, also generates and updates the PR title. Default: `false`.
 
 
@@ -91,8 +92,8 @@ jobs:
           api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           temperature: '0.7'
-          # Choose a Gemini model
-          gemini_model: gemini-2.5-flash
+          # Choose a model (defaults to gemini-1.5-pro for gemini)
+          ai_model: gemini-2.5-flash
           # Also update the PR title
           update_title: 'true'
           # Optional: ignore some paths
@@ -106,8 +107,8 @@ jobs:
           api_key: ${{ secrets.OPENAI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           temperature: '0.7'
-          # Choose an OpenAI model
-          openai_model: gpt-4.1
+          # Choose a model (defaults to gpt-4.1 for open-ai)
+          ai_model: gpt-4.1
           update_title: 'true'
           ignores: 'package-lock.json, dist/**'
 ```
@@ -117,8 +118,7 @@ Tip: set provider and models at the top of your workflow via `env`:
 ```yaml
 env:
   AI_PROVIDER: gemini # or 'openai'
-  GEMINI_MODEL: gemini-2.5-flash
-  OPENAI_MODEL: gpt-4.1
+  AI_MODEL: gemini-2.5-flash # optional; defaults by provider
 ```
 
 ## Supported AI Models

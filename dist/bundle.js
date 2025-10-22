@@ -24834,7 +24834,7 @@ var GoogleGenerativeAI = class {
 var GeminiAIHelper = class {
   apiKey;
   temperature;
-  geminiModel;
+  model;
   constructor(aiHelperParams) {
     Object.assign(this, aiHelperParams);
   }
@@ -24842,7 +24842,7 @@ var GeminiAIHelper = class {
     try {
       console.log("call gemini Ai");
       const genAI = new GoogleGenerativeAI(this.apiKey);
-      const modelName = this.geminiModel && this.geminiModel.trim().length > 0 ? this.geminiModel : "gemini-1.5-pro";
+      const modelName = this.model && this.model.trim().length > 0 ? this.model : "gemini-1.5-pro";
       const model = genAI.getGenerativeModel({
         model: modelName,
         // Provide instructions via systemInstruction instead of an invalid role
@@ -24871,7 +24871,7 @@ var gemini_ai_helper_default = GeminiAIHelper;
 var OpenAIHelper = class {
   apiKey;
   temperature;
-  openaiModel;
+  model;
   constructor(aiHelperParams) {
     Object.assign(this, aiHelperParams);
   }
@@ -24885,7 +24885,7 @@ var OpenAIHelper = class {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: this.openaiModel && this.openaiModel.trim().length > 0 ? this.openaiModel : "gpt-4.1",
+          model: this.model && this.model.trim().length > 0 ? this.model : "gpt-4.1",
           messages: [
             {
               role: "system",
@@ -24907,7 +24907,7 @@ var OpenAIHelper = class {
       const description = data.choices[0].message.content.trim();
       return description;
     } catch (error) {
-      throw new Error(`OenAi API Error: ${error.message}`);
+      throw new Error(`OpenAI API Error: ${error.message}`);
     }
   }
 };
@@ -24976,12 +24976,14 @@ var PullRequestUpdater = class {
   constructor() {
     this.gitHelper = new GitHelper((0, import_core.getInput)("ignores"));
     this.context = import_github.context;
+    const aiName = (0, import_core.getInput)("ai_name", { required: true });
+    const aiModelInput = (0, import_core.getInput)("ai_model") || "";
+    const resolvedModel = aiModelInput && aiModelInput.trim().length > 0 ? aiModelInput : aiName === "open-ai" || aiName === "openai" ? "gpt-4.1" : "gemini-1.5-pro";
     this.aiHelper = ai_helper_resolver_default({
       apiKey: (0, import_core.getInput)("api_key", { required: true }),
-      aiName: (0, import_core.getInput)("ai_name", { required: true }),
+      aiName,
       temperature: parseFloat((0, import_core.getInput)("temperature") || "0.8"),
-      geminiModel: (0, import_core.getInput)("gemini_model") || "gemini-1.5-pro",
-      openaiModel: (0, import_core.getInput)("openai_model") || "gpt-4.1"
+      model: resolvedModel
     });
     const githubToken = (0, import_core.getInput)("github_token", { required: true });
     this.octokit = (0, import_github.getOctokit)(githubToken);
@@ -25301,6 +25303,7 @@ ${diffOutput}`;
     if (!scope) {
       scope = this.chooseScopeFromFilesWithMonorepo(files) || void 0;
     }
+    bareSubject = bareSubject.replace(/\s*#\d+\s*$/g, "").trim();
     bareSubject = this.toImperativeWithLog(bareSubject);
     const prefix = `${type}${scope ? `(${scope})` : ""}: `;
     const maxLen = 72;

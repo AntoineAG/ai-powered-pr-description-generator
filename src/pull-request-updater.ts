@@ -14,12 +14,17 @@ class PullRequestUpdater {
   constructor() {
     this.gitHelper = new GitHelper(getInput("ignores"));
     this.context = context;
+    const aiName = getInput("ai_name", { required: true });
+    const aiModelInput = getInput("ai_model") || '';
+    const resolvedModel = (aiModelInput && aiModelInput.trim().length > 0)
+      ? aiModelInput
+      : ((aiName === 'open-ai' || aiName === 'openai') ? 'gpt-4.1' : 'gemini-1.5-pro');
+
     this.aiHelper = aiHelperResolver({
       apiKey: getInput("api_key", { required: true }),
-      aiName: getInput("ai_name", { required: true }),
+      aiName,
       temperature: parseFloat(getInput("temperature") || "0.8"),
-      geminiModel: getInput("gemini_model") || 'gemini-1.5-pro',
-      openaiModel: getInput("openai_model") || 'gpt-4.1',
+      model: resolvedModel,
     });
     const githubToken = getInput("github_token", { required: true });
     this.octokit = getOctokit(githubToken);
