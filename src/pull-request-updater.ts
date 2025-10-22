@@ -71,6 +71,150 @@ ${diffOutput}`;
     return cleaned.length > 72 ? cleaned.slice(0, 72).trim() : cleaned;
   }
 
+  private parseConventionalCommit(title: string): { type?: string; scope?: string; subject: string } {
+    const re = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(?:\(([^)]+)\))?:\s*(.+)$/i;
+    const m = title.match(re);
+    if (m) {
+      return { type: m[1].toLowerCase(), scope: m[2], subject: (m[3] || '').trim() };
+    }
+    return { subject: title.trim() };
+  }
+
+  private chooseScopeFromFiles(files: string[]): string | undefined {
+    if (!files || files.length === 0) return undefined;
+
+    const candidates: Record<string, number> = {};
+    const bump = (k?: string) => {
+      if (!k) return;
+      candidates[k] = (candidates[k] || 0) + 1;
+    };
+
+    for (const f of files) {
+      const parts = f.split('/').filter(Boolean);
+      if (parts[0] === '.github') { bump('ci'); continue; }
+      if (parts.length === 1) {
+        bump('root');
+        continue;
+      }
+      if (parts[0] === 'apps' && parts[1]) { bump(parts[1]); continue; }
+      if (parts[0] === 'packages' && parts[1]) { bump(parts[1]); continue; }
+      if (['backend','frontend','server','client','api','web','app'].includes(parts[0])) { bump(parts[0]); continue; }
+      if (parts[0] === 'src' && parts[1]) { bump(parts[1]); continue; }
+      bump(parts[0]);
+    }
+
+    let best: string | undefined;
+    let bestCount = 0;
+    for (const [k, v] of Object.entries(candidates)) {
+      if (v > bestCount) { best = k; bestCount = v; }
+    }
+    if (!best) return undefined;
+
+    const total = files.length;
+    if (bestCount / total < 0.5 || Object.keys(candidates).length > 3) {
+      return 'monorepo';
+    }
+    if (best === 'root') return 'repo';
+    return best;
+  }
+
+  private toImperative(subject: string): string {
+    if (!subject) return subject;
+    let s = subject.trim().replace(/\s+/g, ' ').replace(/[\.!?]+$/g, '');
+
+    const wordRe = /(^|:\s*|\()([A-Za-z][\w'-]*)/;
+    const m = s.match(wordRe);
+    if (!m) return s;
+
+    const startIdx = (m.index || 0) + m[1].length;
+    const word = m[2];
+
+    const lemmas: Record<string, string> = {
+      adds: 'add', added: 'add', adding: 'add',
+      fixes: 'fix', fixed: 'fix', fixing: 'fix',
+      updates: 'update', updated: 'update', updating: 'update',
+      removes: 'remove', removed: 'remove', removing: 'remove',
+      improves: 'improve', improved: 'improve', improving: 'improve',
+      introduces: 'introduce', introduced: 'introduce', introducing: 'introduce',
+      refactors: 'refactor', refactored: 'refactor', refactoring: 'refactor',
+      migrates: 'migrate', migrated: 'migrate', migrating: 'migrate',
+      renames: 'rename', renamed: 'rename', renaming: 'rename',
+      optimizes: 'optimize', optimized: 'optimize', optimizing: 'optimize',
+      uses: 'use', used: 'use', using: 'use',
+      ensures: 'ensure', ensured: 'ensure', ensuring: 'ensure',
+    };
+
+    const lower = word.toLowerCase();
+    const base = lemmas[lower] || lower;
+    s = s.slice(0, startIdx) + base + s.slice(startIdx + word.length);
+    return s;
+  }
+
+  private inferCommitType(diffOutput: string, files: string[], currentTitle: string, subject: string): string {
+    const lowerAll = (s: string) => (s || '').toLowerCase();
+    const d = lowerAll(diffOutput);
+    const t = lowerAll(currentTitle + ' ' + subject);
+
+    const isDocsFile = (f: string) => /(^docs\/|\.md$|README\.[^/]*$)/i.test(f);
+    const isTestFile = (f: string) => /(\.test\.|\.spec\.|__tests__\/|^tests\/)/i.test(f);
+    const isCiFile = (f: string) => /(^\.github\/|^\.circleci\/|gitlab-ci\.yml$|azure-pipelines\.yml$)/i.test(f);
+    const isBuildFile = (f: string) => /(^Dockerfile$|docker-compose|^turbo\.json$|^pnpm-workspace\.ya?ml$|^package\.json$|^vite\.config|^webpack\.config|^rollup\.config|^tsconfig\.json$|babel|^Makefile$)/i.test(f);
+    const isStyleFile = (f: string) => /(\.css$|\.scss$|\.sass$|\.less$)/i.test(f);
+    const isCodeFile = (f: string) => /(\.ts$|\.tsx$|\.js$|\.jsx$|\.py$|\.go$|\.rb$|\.rs$|\.java$|\.php$)/i.test(f);
+
+    const every = (pred: (f: string) => boolean) => files.length > 0 && files.every(pred);
+    const some = (pred: (f: string) => boolean) => files.some(pred);
+
+    if (files.length > 0) {
+      if (every(isDocsFile)) return 'docs';
+      if (every(isTestFile)) return 'test';
+      if (every(isCiFile)) return 'ci';
+      if (every(isBuildFile)) return 'build';
+      if (every(isStyleFile)) return 'style';
+    }
+
+    if (/\bfix(e[sd]|ing)?\b|\bbug\b|\berror\b|\bissue\b|\bcorrect\b/.test(d) || /\bfix\b/.test(t)) {
+      return 'fix';
+    }
+    if (/\brefactor(ing|ed|s)?\b|\bcleanup\b|\brename\b|\brestructure\b/.test(d) || /\brefactor\b/.test(t)) {
+      return 'refactor';
+    }
+    if (/\bperf(ormance)?\b|\boptimi[sz]e\b|\bfaster\b|\bspeed\b/.test(d + ' ' + t)) {
+      return 'perf';
+    }
+
+    if (some(isCiFile) && !some(isCodeFile)) return 'ci';
+    if (some(isBuildFile) && !some(isCodeFile)) return 'build';
+    if (some(isDocsFile) && !some(isCodeFile)) return 'docs';
+    if (some(isTestFile) && !some(isCodeFile)) return 'test';
+
+    if (some(isCodeFile)) return 'feat';
+    return 'chore';
+  }
+
+  private formatConventionalCommitTitle(subject: string, diffOutput: string, files: string[], currentTitle: string): string {
+    const parsed = this.parseConventionalCommit(subject);
+    let type = parsed.type;
+    let scope = parsed.scope;
+    let bareSubject = parsed.type ? parsed.subject : subject;
+
+    if (!type) {
+      type = this.inferCommitType(diffOutput, files, currentTitle, bareSubject);
+    }
+    if (!scope) {
+      scope = this.chooseScopeFromFiles(files) || undefined;
+    }
+
+    bareSubject = this.toImperative(bareSubject);
+
+    const prefix = `${type}${scope ? `(${scope})` : ''}: `;
+    const maxLen = 72;
+    const allowedSubjectLen = Math.max(0, maxLen - prefix.length);
+    let finalSubject = bareSubject.length > allowedSubjectLen ? bareSubject.slice(0, allowedSubjectLen).trim() : bareSubject;
+    finalSubject = finalSubject.replace(/[\.!?]+$/g, '');
+    return `${prefix}${finalSubject}`;
+  }
+
   async run() {
     try {
       // Validate the event context
@@ -87,6 +231,7 @@ ${diffOutput}`;
 
       // Get the diff and generate the PR description
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
+      const changedFiles = this.gitHelper.getChangedFiles(baseBranch, headBranch);
       const prompt = this.generatePrompt(diffOutput, creator);
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
 
@@ -96,7 +241,8 @@ ${diffOutput}`;
       if (this.updateTitle) {
         const titlePrompt = this.generateTitlePrompt(diffOutput, currentTitle);
         const rawTitle = await this.aiHelper.createPullRequestDescription(diffOutput, titlePrompt);
-        generatedTitle = this.sanitizeTitle(rawTitle);
+        const cleaned = this.sanitizeTitle(rawTitle);
+        generatedTitle = this.formatConventionalCommitTitle(cleaned, diffOutput, changedFiles, currentTitle);
       }
 
       // Update the pull request description
