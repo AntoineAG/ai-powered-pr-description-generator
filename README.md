@@ -54,12 +54,63 @@ Before using the generator, you need to configure the following secrets in your 
 
 GITHUB_TOKEN should be required (https://github.com/settings/tokens), it needs permission to modify the pull request.
 
+### Action Inputs
+- `ai_name` (required): Which provider to use. Supported: `gemini`, `open-ai`.
+- `api_key` (required): API key for the selected provider.
+- `temperature` (optional): Creativity (0.0–1.0). Default: `0.7`.
+- `ignores` (optional): Comma-separated paths to ignore in diffs.
+- `use_jira` (optional): Enable Jira ticket extraction from branch. Default: `false`.
+- `ai_model` (optional): Model to use. Default depends on `ai_name`:
+  - `gemini` -> `gemini-1.5-pro` (e.g., `gemini-2.5-flash`, `gemini-2.5-flash-lite`)
+  - `open-ai` -> `gpt-4.1` (e.g., `gpt-4.1`, `gpt-4.1-mini`)
 
 ## Usage
 Once configured, the action will automatically execute whenever a pull request is created or a commit is pushed to the repository.
 
 ## GitHub Workflow
 Here's an example of how to set up your GitHub Actions workflow file (.github/workflows/description-generator.yml):
+
+```yaml
+name: AI PR Description Generator
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.pull_request.draft == false }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate PR description (${{ env.AI_PROVIDER }})
+        uses: 57blocks/ai-powered-pr-description-generator@v1.2.0
+        with:
+          ai_name: gemini
+          ai_model: ${{ env.AI_MODEL }}
+          update_title: true
+          api_key: ${{ secrets.GEMINI_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          temperature: "0.4"
+          ignores: ".git/**,.github/**,.vscode/**,node_modules/**,.next/**,dist/**,build/**,out/**,coverage/**,*.lock,package-lock.json,pnpm-lock.yaml,yarn.lock,*.png,*.jpg,*.jpeg,*.gif,*.webp,*.svg,*.ico,*.pdf,*.zip,*.mp4,*.mov"
+
+```
+
+Tip: set provider and models at the top of your workflow via `env`:
+
+```yaml
+env:
+  AI_PROVIDER: gemini # or 'openai'
+  AI_MODEL: gemini-2.5-flash # or 'gpt-4.1'
+
+```
 
 ## Supported AI Models
 The project currently supports the following AI models for generating descriptions:
