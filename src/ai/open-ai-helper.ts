@@ -16,8 +16,8 @@ class OpenAIHelper implements AIHelperInterface {
       const promptPreview = prompt.length > 2000 ? `${prompt.slice(0, 2000)}[...]` : prompt;
       core.startGroup('[AI][OpenAI] Request');
       core.info(`model=${modelName} temperature=${this.temperature}`);
-      // Keep prompt truncated because it contains the diff
-      core.info(`promptLength=${prompt.length} truncatedPreview:\n${promptPreview}`);
+      core.info(`promptLength=${prompt.length}`);
+      core.info(`truncatedPreview:\n${promptPreview}`);
       core.endGroup();
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
