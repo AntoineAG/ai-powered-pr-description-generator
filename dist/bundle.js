@@ -24875,7 +24875,8 @@ var GeminiAIHelper = class {
       const finishReason = response.candidates?.[0]?.finishReason || result.candidates?.[0]?.finishReason;
       core.startGroup("[AI][Gemini] Response");
       core.info(`finishReason=${finishReason}`);
-      core.debug(`usage=${JSON.stringify(usage)} descLength=${text.length} preview=${text.slice(0, 200).replace(/\n/g, "\\n")}`);
+      core.debug(`usage=${JSON.stringify(usage)} descLength=${text.length}`);
+      core.debug(`description=${text.replace(/\n/g, "\\n")}`);
       core.endGroup();
       if (finishReason === "MAX_TOKENS") {
         core.info("[AI][Gemini] continuation: finishReason=MAX_TOKENS, requesting more...");
@@ -24892,7 +24893,8 @@ var GeminiAIHelper = class {
         const fr2 = contResp.candidates?.[0]?.finishReason;
         core.startGroup("[AI][Gemini] Continuation Response");
         core.info(`finishReason=${fr2}`);
-        core.debug(`moreLength=${more.length} morePreview=${more.slice(0, 200).replace(/\n/g, "\\n")}`);
+        core.debug(`moreLength=${more.length}`);
+        core.debug(`more=${more.replace(/\n/g, "\\n")}`);
         core.endGroup();
         text = (text + "\n\n" + more).trim();
       }
@@ -24920,7 +24922,7 @@ var OpenAIHelper = class {
       const promptPreview = prompt.slice(0, 400).replace(/\n/g, "\\n");
       core2.startGroup("[AI][OpenAI] Request");
       core2.info(`model=${modelName} temperature=${this.temperature}`);
-      core2.debug(`promptLength=${prompt.length} preview=${promptPreview}`);
+      core2.debug(`promptLength=${prompt.length} truncatedPreview=${promptPreview}`);
       core2.endGroup();
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -24946,14 +24948,14 @@ var OpenAIHelper = class {
       });
       const raw = await response.text();
       if (!response.ok) {
-        core2.error(`[AI][OpenAI] http_error status=${response.status} preview=${raw.slice(0, 400)}`);
-        throw new Error(`OpenAI API HTTP ${response.status}: ${raw.slice(0, 200)}`);
+        core2.error(`[AI][OpenAI] http_error status=${response.status} body=${raw}`);
+        throw new Error(`OpenAI API HTTP ${response.status}: ${raw}`);
       }
       let data;
       try {
         data = JSON.parse(raw);
       } catch (e) {
-        core2.error(`[AI][OpenAI] parse_error preview=${raw.slice(0, 400)}`);
+        core2.error(`[AI][OpenAI] parse_error body=${raw}`);
         throw e;
       }
       if (data.error) {
@@ -24965,7 +24967,8 @@ var OpenAIHelper = class {
       const usage = data.usage || {};
       core2.startGroup("[AI][OpenAI] Response");
       core2.info(`finishReason=${finishReason}`);
-      core2.debug(`usage=${JSON.stringify(usage)} descLength=${description.length} preview=${description.slice(0, 200).replace(/\n/g, "\\n")}`);
+      core2.debug(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
+      core2.debug(`description=${description.replace(/\n/g, "\\n")}`);
       core2.endGroup();
       if (finishReason === "length") {
         core2.info("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
@@ -24999,11 +25002,12 @@ var OpenAIHelper = class {
           const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
           core2.startGroup("[AI][OpenAI] Continuation Response");
           core2.info(`finishReason=${fr2}`);
-          core2.debug(`moreLength=${more.length} morePreview=${more.slice(0, 200).replace(/\n/g, "\\n")}`);
+          core2.debug(`moreLength=${more.length}`);
+          core2.debug(`more=${more.replace(/\n/g, "\\n")}`);
           core2.endGroup();
           description = (description + "\n\n" + more).trim();
         } else {
-          core2.warning(`[AI][OpenAI] continuation failed status=${contResp.status} preview=${contRaw.slice(0, 200)}`);
+          core2.warning(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
         }
       }
       return description;
@@ -25119,6 +25123,7 @@ var PullRequestUpdater = class {
       core5.info("[Desc] calling AI to generate description");
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
       core5.debug(`[Desc] AI description length=${generatedDescription.length}`);
+      core5.debug(`[Desc] AI description content=${generatedDescription.replace(/\n/g, "\\n")}`);
       core5.endGroup();
       core5.startGroup("PR Update");
       core5.info(`[Desc] updating pull request #${pullRequestNumber}`);
@@ -25156,6 +25161,7 @@ var PullRequestUpdater = class {
         );
       }
       core5.debug(`[Desc] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
+      core5.debug(`[Desc] new description content=${generatedDescription.replace(/\n/g, "\\n")}`);
       await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
     } catch (error4) {
       core5.error(`Error updating PR #${pullRequestNumber} description: ${error4.message}`);

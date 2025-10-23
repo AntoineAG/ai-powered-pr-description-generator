@@ -16,7 +16,8 @@ class OpenAIHelper implements AIHelperInterface {
       const promptPreview = prompt.slice(0, 400).replace(/\n/g, '\\n');
         core.startGroup('[AI][OpenAI] Request');
         core.info(`model=${modelName} temperature=${this.temperature}`);
-        core.debug(`promptLength=${prompt.length} preview=${promptPreview}`);
+        // Keep prompt truncated because it contains the diff
+        core.debug(`promptLength=${prompt.length} truncatedPreview=${promptPreview}`);
         core.endGroup();
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -42,12 +43,12 @@ class OpenAIHelper implements AIHelperInterface {
         });
         const raw = await response.text();
           if (!response.ok) {
-            core.error(`[AI][OpenAI] http_error status=${response.status} preview=${raw.slice(0, 400)}`);
-            throw new Error(`OpenAI API HTTP ${response.status}: ${raw.slice(0, 200)}`);
+            core.error(`[AI][OpenAI] http_error status=${response.status} body=${raw}`);
+            throw new Error(`OpenAI API HTTP ${response.status}: ${raw}`);
           }
         let data: any;
           try { data = JSON.parse(raw); } catch (e) {
-            core.error(`[AI][OpenAI] parse_error preview=${raw.slice(0, 400)}`);
+            core.error(`[AI][OpenAI] parse_error body=${raw}`);
             throw e;
           }
           if (data.error) {
@@ -59,7 +60,8 @@ class OpenAIHelper implements AIHelperInterface {
         const usage = data.usage || {};
           core.startGroup('[AI][OpenAI] Response');
           core.info(`finishReason=${finishReason}`);
-          core.debug(`usage=${JSON.stringify(usage)} descLength=${description.length} preview=${description.slice(0, 200).replace(/\n/g, '\\n')}`);
+          core.debug(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
+          core.debug(`description=${description.replace(/\n/g, '\\n')}`);
           core.endGroup();
 
         // If output was cut by token limit, try a single continuation
@@ -91,11 +93,12 @@ class OpenAIHelper implements AIHelperInterface {
             const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
             core.startGroup('[AI][OpenAI] Continuation Response');
             core.info(`finishReason=${fr2}`);
-            core.debug(`moreLength=${more.length} morePreview=${more.slice(0, 200).replace(/\n/g, '\\n')}`);
+            core.debug(`moreLength=${more.length}`);
+            core.debug(`more=${more.replace(/\n/g, '\\n')}`);
             core.endGroup();
             description = (description + '\n\n' + more).trim();
           } else {
-            core.warning(`[AI][OpenAI] continuation failed status=${contResp.status} preview=${contRaw.slice(0, 200)}`);
+            core.warning(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
           }
         }
 

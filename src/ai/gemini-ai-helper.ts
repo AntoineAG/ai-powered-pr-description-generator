@@ -42,7 +42,8 @@ class GeminiAIHelper implements AIHelperInterface {
       const finishReason = response.candidates?.[0]?.finishReason || (result as any).candidates?.[0]?.finishReason;
       core.startGroup('[AI][Gemini] Response');
       core.info(`finishReason=${finishReason}`);
-      core.debug(`usage=${JSON.stringify(usage)} descLength=${text.length} preview=${text.slice(0, 200).replace(/\n/g, '\\n')}`);
+      core.debug(`usage=${JSON.stringify(usage)} descLength=${text.length}`);
+      core.debug(`description=${text.replace(/\n/g, '\\n')}`);
       core.endGroup();
 
       // If cut by MAX_TOKENS, request a continuation once
@@ -61,7 +62,8 @@ class GeminiAIHelper implements AIHelperInterface {
         const fr2 = contResp.candidates?.[0]?.finishReason;
         core.startGroup('[AI][Gemini] Continuation Response');
         core.info(`finishReason=${fr2}`);
-        core.debug(`moreLength=${more.length} morePreview=${more.slice(0, 200).replace(/\n/g, '\\n')}`);
+        core.debug(`moreLength=${more.length}`);
+        core.debug(`more=${more.replace(/\n/g, '\\n')}`);
         core.endGroup();
         text = (text + '\n\n' + more).trim();
       }
