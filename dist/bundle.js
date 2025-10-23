@@ -133,11 +133,11 @@ var require_command = __commonJS({
         return cmdStr;
       }
     };
-    function escapeData(s) {
-      return (0, utils_1.toCommandValue)(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+    function escapeData(s2) {
+      return (0, utils_1.toCommandValue)(s2).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
     }
-    function escapeProperty(s) {
-      return (0, utils_1.toCommandValue)(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A").replace(/:/g, "%3A").replace(/,/g, "%2C");
+    function escapeProperty(s2) {
+      return (0, utils_1.toCommandValue)(s2).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A").replace(/:/g, "%3A").replace(/,/g, "%2C");
     }
   }
 });
@@ -5054,11 +5054,11 @@ var require_file = __commonJS({
       const bytes = [];
       for (const element of parts) {
         if (typeof element === "string") {
-          let s = element;
+          let s2 = element;
           if (options.endings === "native") {
-            s = convertLineEndingsNative(s);
+            s2 = convertLineEndingsNative(s2);
           }
-          bytes.push(encoder.encode(s));
+          bytes.push(encoder.encode(s2));
         } else if (types.isAnyArrayBuffer(element) || types.isTypedArray(element)) {
           if (!element.buffer) {
             bytes.push(new Uint8Array(element));
@@ -5073,12 +5073,12 @@ var require_file = __commonJS({
       }
       return bytes;
     }
-    function convertLineEndingsNative(s) {
+    function convertLineEndingsNative(s2) {
       let nativeLineEnding = "\n";
       if (process.platform === "win32") {
         nativeLineEnding = "\r\n";
       }
-      return s.replace(/\r?\n/g, nativeLineEnding);
+      return s2.replace(/\r?\n/g, nativeLineEnding);
     }
     function isFileLike(object) {
       return NativeFile && object instanceof NativeFile || object instanceof File || object && (typeof object.stream === "function" || typeof object.arrayBuffer === "function") && object[Symbol.toStringTag] === "File";
@@ -18973,15 +18973,15 @@ var require_toolrunner = __commonJS({
       }
       _processLineBuffer(data, strBuffer, onLine) {
         try {
-          let s = strBuffer + data.toString();
-          let n = s.indexOf(os.EOL);
+          let s2 = strBuffer + data.toString();
+          let n = s2.indexOf(os.EOL);
           while (n > -1) {
-            const line = s.substring(0, n);
+            const line = s2.substring(0, n);
             onLine(line);
-            s = s.substring(n + os.EOL.length);
-            n = s.indexOf(os.EOL);
+            s2 = s2.substring(n + os.EOL.length);
+            n = s2.indexOf(os.EOL);
           }
-          return s;
+          return s2;
         } catch (err) {
           this._debug(`error processing line. Failed with error ${err}`);
           return "";
@@ -19183,8 +19183,8 @@ var require_toolrunner = __commonJS({
                   this.options.listeners.stderr(data);
                 }
                 if (!optionsNonNull.silent && optionsNonNull.errStream && optionsNonNull.outStream) {
-                  const s = optionsNonNull.failOnStdErr ? optionsNonNull.errStream : optionsNonNull.outStream;
-                  s.write(data);
+                  const s2 = optionsNonNull.failOnStdErr ? optionsNonNull.errStream : optionsNonNull.outStream;
+                  s2.write(data);
                 }
                 errbuffer = this._processLineBuffer(data, errbuffer, (line) => {
                   if (this.options.listeners && this.options.listeners.errline) {
@@ -24848,7 +24848,7 @@ var GeminiAIHelper = class {
   async createPullRequestDescription(diffOutput, prompt) {
     try {
       const modelName = this.model?.trim() || "gemini-2.5-flash";
-      const maxTokensEnv = Number.parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || "", 10);
+      const maxTokensEnv = Number.parseInt(process.env.MAX_OUTPUT_TOKENS || "", 10);
       const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? maxTokensEnv : 2048;
       const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
       core.startGroup("[AI][Gemini] Request");
@@ -24857,6 +24857,7 @@ var GeminiAIHelper = class {
       core.info(`promptPreview:
 ${promptPreview}`);
       core.endGroup();
+      s;
       const systemText = "You are very good at reviewing code and can generate pull request descriptions.";
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const model = genAI.getGenerativeModel({
