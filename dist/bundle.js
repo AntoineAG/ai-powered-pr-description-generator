@@ -24848,8 +24848,7 @@ var GeminiAIHelper = class {
   async createPullRequestDescription(diffOutput, prompt) {
     try {
       const modelName = this.model?.trim() || "gemini-2.5-flash";
-      const maxTokensEnv = Number.parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || "", 10);
-      const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? maxTokensEnv : 2048;
+      const maxOutputTokens = 20;
       const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
       core.startGroup("[AI][Gemini] Request");
       core.info(`model=${modelName} temperature=${this.temperature} maxOutputTokens=${maxOutputTokens}`);
