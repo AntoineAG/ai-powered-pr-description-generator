@@ -14,7 +14,7 @@ class GeminiAIHelper implements AIHelperInterface {
   async createPullRequestDescription(diffOutput: string, prompt: string): Promise<string> {
     try {
       const modelName = this.model?.trim() || 'gemini-1.5-pro';
-      const promptPreview = prompt.slice(0, 400).replace(/\n/g, '\\n');
+      const promptPreview = prompt.slice(0, 1000).replace(/\n/g, '\n').concat('...');
       core.startGroup('[AI][Gemini] Request');
       core.info(`model=${modelName} temperature=${this.temperature}`);
       core.info(`promptLength=${prompt.length} preview=${promptPreview}`);
@@ -43,7 +43,7 @@ class GeminiAIHelper implements AIHelperInterface {
       core.startGroup('[AI][Gemini] Response');
       core.info(`finishReason=${finishReason}`);
       core.info(`usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      core.info(`description=${text.replace(/\n/g, '\\n')}`);
+      core.info(`description=${text.replace(/\n/g, '\n')}`);
       core.endGroup();
 
       // If cut by MAX_TOKENS, request a continuation once
@@ -63,7 +63,7 @@ class GeminiAIHelper implements AIHelperInterface {
         core.startGroup('[AI][Gemini] Continuation Response');
         core.info(`finishReason=${fr2}`);
         core.info(`moreLength=${more.length}`);
-        core.info(`more=${more.replace(/\n/g, '\\n')}`);
+        core.info(`more=${more.replace(/\n/g, '\n')}`);
         core.endGroup();
         text = (text + '\n\n' + more).trim();
       }
