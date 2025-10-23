@@ -75,7 +75,7 @@ class PullRequestUpdater {
       core.info('[PR-Description] calling AI to generate description');
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
       core.info(`[PR-Description] AI description length=${generatedDescription.length}`);
-      core.info(`[PR-Description] AI description content=${generatedDescription.replace(/\n/g, '\\n')}`);
+      core.info(`[PR-Description] AI description content:\n${generatedDescription}`);
       core.endGroup();
 
       // Update the pull request description
@@ -124,7 +124,7 @@ class PullRequestUpdater {
       }
 
       core.info(`[PR-Description] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
-      core.info(`[PR-Description] new description content=${generatedDescription.replace(/\n/g, '\\n')}`);
+      core.info(`[PR-Description] new description content:\n${generatedDescription}`);
       // Apply the new pull request description
       await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
     } catch (error) {
