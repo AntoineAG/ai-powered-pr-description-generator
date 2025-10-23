@@ -133,11 +133,11 @@ var require_command = __commonJS({
         return cmdStr;
       }
     };
-    function escapeData(s2) {
-      return (0, utils_1.toCommandValue)(s2).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+    function escapeData(s) {
+      return (0, utils_1.toCommandValue)(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
     }
-    function escapeProperty(s2) {
-      return (0, utils_1.toCommandValue)(s2).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A").replace(/:/g, "%3A").replace(/,/g, "%2C");
+    function escapeProperty(s) {
+      return (0, utils_1.toCommandValue)(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A").replace(/:/g, "%3A").replace(/,/g, "%2C");
     }
   }
 });
@@ -5054,11 +5054,11 @@ var require_file = __commonJS({
       const bytes = [];
       for (const element of parts) {
         if (typeof element === "string") {
-          let s2 = element;
+          let s = element;
           if (options.endings === "native") {
-            s2 = convertLineEndingsNative(s2);
+            s = convertLineEndingsNative(s);
           }
-          bytes.push(encoder.encode(s2));
+          bytes.push(encoder.encode(s));
         } else if (types.isAnyArrayBuffer(element) || types.isTypedArray(element)) {
           if (!element.buffer) {
             bytes.push(new Uint8Array(element));
@@ -5073,12 +5073,12 @@ var require_file = __commonJS({
       }
       return bytes;
     }
-    function convertLineEndingsNative(s2) {
+    function convertLineEndingsNative(s) {
       let nativeLineEnding = "\n";
       if (process.platform === "win32") {
         nativeLineEnding = "\r\n";
       }
-      return s2.replace(/\r?\n/g, nativeLineEnding);
+      return s.replace(/\r?\n/g, nativeLineEnding);
     }
     function isFileLike(object) {
       return NativeFile && object instanceof NativeFile || object instanceof File || object && (typeof object.stream === "function" || typeof object.arrayBuffer === "function") && object[Symbol.toStringTag] === "File";
@@ -18973,15 +18973,15 @@ var require_toolrunner = __commonJS({
       }
       _processLineBuffer(data, strBuffer, onLine) {
         try {
-          let s2 = strBuffer + data.toString();
-          let n = s2.indexOf(os.EOL);
+          let s = strBuffer + data.toString();
+          let n = s.indexOf(os.EOL);
           while (n > -1) {
-            const line = s2.substring(0, n);
+            const line = s.substring(0, n);
             onLine(line);
-            s2 = s2.substring(n + os.EOL.length);
-            n = s2.indexOf(os.EOL);
+            s = s.substring(n + os.EOL.length);
+            n = s.indexOf(os.EOL);
           }
-          return s2;
+          return s;
         } catch (err) {
           this._debug(`error processing line. Failed with error ${err}`);
           return "";
@@ -19183,8 +19183,8 @@ var require_toolrunner = __commonJS({
                   this.options.listeners.stderr(data);
                 }
                 if (!optionsNonNull.silent && optionsNonNull.errStream && optionsNonNull.outStream) {
-                  const s2 = optionsNonNull.failOnStdErr ? optionsNonNull.errStream : optionsNonNull.outStream;
-                  s2.write(data);
+                  const s = optionsNonNull.failOnStdErr ? optionsNonNull.errStream : optionsNonNull.outStream;
+                  s.write(data);
                 }
                 errbuffer = this._processLineBuffer(data, errbuffer, (line) => {
                   if (this.options.listeners && this.options.listeners.errline) {
@@ -19729,10 +19729,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.error = error4;
-    function warning3(message, properties = {}) {
+    function warning2(message, properties = {}) {
       (0, command_1.issueCommand)("warning", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.warning = warning3;
+    exports2.warning = warning2;
     function notice(message, properties = {}) {
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -24902,7 +24902,6 @@ var GeminiAIHelper = class {
       core.info(`promptPreview:
 ${promptPreview}`);
       core.endGroup();
-      s;
       const systemText = "You are very good at reviewing code and can generate pull request descriptions.";
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const model = genAI.getGenerativeModel({
@@ -24921,19 +24920,7 @@ ${prompt}` : prompt }] }
         }
       });
       const response = result.response;
-      let text = "";
-      try {
-        text = response.text();
-      } catch (e) {
-        core.warning(`[AI][Gemini] response.text() failed: ${e?.message || e}`);
-        try {
-          const parts = response?.candidates?.[0]?.content?.parts || [];
-          text = parts.map((p) => p?.text || "").join("");
-        } catch (aggErr) {
-          core.warning(`[AI][Gemini] fallback aggregate parts failed: ${aggErr?.message || aggErr}`);
-          throw e;
-        }
-      }
+      let text = response.text();
       const usage = response.usageMetadata || result.usageMetadata || void 0;
       const finishReason = response.candidates?.[0]?.finishReason || result.candidates?.[0]?.finishReason;
       core.startGroup("[AI][Gemini] Response");
@@ -24965,10 +24952,8 @@ ${more}`);
       }
       return text;
     } catch (error4) {
-      const err = error4;
-      core.error(`[AI][Gemini] exception message=${err.message}`);
-      if (err.stack) core.error(`[AI][Gemini] stack=${err.stack}`);
-      throw new Error(`Gemini API Error: ${err.message}`);
+      core.error(`[AI][Gemini] exception message=${error4.message}`);
+      throw new Error(`Gemini API Error: ${error4.message}`);
     }
   }
 };
