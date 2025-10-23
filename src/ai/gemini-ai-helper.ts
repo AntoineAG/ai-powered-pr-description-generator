@@ -13,11 +13,12 @@ class GeminiAIHelper implements AIHelperInterface {
 
   async createPullRequestDescription(diffOutput: string, prompt: string): Promise<string> {
     try {
-      const modelName = this.model?.trim() || 'gemini-1.5-pro';
+      const modelName = this.model?.trim() || 'gemini-2.5-flash';
       const promptPreview = prompt.length > 2000 ? `${prompt.slice(0, 2000)}[...]` : prompt;
       core.startGroup('[AI][Gemini] Request');
       core.info(`model=${modelName} temperature=${this.temperature}`);
-      core.info(`promptLength=${prompt.length} truncatedPreview:\n${promptPreview}`);
+      core.info(`promptLength=${prompt.length}`);
+      core.info(`promptPreview:\n${promptPreview}`);
       core.endGroup();
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const model = genAI.getGenerativeModel({
