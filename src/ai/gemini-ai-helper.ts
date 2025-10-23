@@ -33,7 +33,7 @@ class GeminiAIHelper implements AIHelperInterface {
         ],
         generationConfig: {
           temperature: this.temperature,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 1024,
         },
       });
 
