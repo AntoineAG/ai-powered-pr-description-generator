@@ -28,12 +28,12 @@ export class GitHelper {
           ? this.ignores.split(',').map(item => `:!${item.trim()}`) // Trim whitespace from items
           : defaultIgnoreFiles;
   
-      core.debug(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
+      core.info(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
   
       // Execute the git diff command and get the output
       const diffOutput = execSync(`git diff origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(' ')}`, { encoding: 'utf8' });
       
-      core.debug(`Filtered diff length: ${diffOutput.length}`);
+      core.info(`Filtered diff length: ${diffOutput.length}`);
       return diffOutput;
   }
 }

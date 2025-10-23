@@ -17,7 +17,7 @@ class OpenAIHelper implements AIHelperInterface {
         core.startGroup('[AI][OpenAI] Request');
         core.info(`model=${modelName} temperature=${this.temperature}`);
         // Keep prompt truncated because it contains the diff
-        core.debug(`promptLength=${prompt.length} truncatedPreview=${promptPreview}`);
+        core.info(`promptLength=${prompt.length} truncatedPreview=${promptPreview}`);
         core.endGroup();
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -60,8 +60,8 @@ class OpenAIHelper implements AIHelperInterface {
         const usage = data.usage || {};
           core.startGroup('[AI][OpenAI] Response');
           core.info(`finishReason=${finishReason}`);
-          core.debug(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
-          core.debug(`description=${description.replace(/\n/g, '\\n')}`);
+          core.info(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
+          core.info(`description=${description.replace(/\n/g, '\\n')}`);
           core.endGroup();
 
         // If output was cut by token limit, try a single continuation
@@ -93,8 +93,8 @@ class OpenAIHelper implements AIHelperInterface {
             const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
             core.startGroup('[AI][OpenAI] Continuation Response');
             core.info(`finishReason=${fr2}`);
-            core.debug(`moreLength=${more.length}`);
-            core.debug(`more=${more.replace(/\n/g, '\\n')}`);
+            core.info(`moreLength=${more.length}`);
+            core.info(`more=${more.replace(/\n/g, '\\n')}`);
             core.endGroup();
             description = (description + '\n\n' + more).trim();
           } else {

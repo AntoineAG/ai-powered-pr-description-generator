@@ -392,7 +392,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug4("making CONNECT request");
+      debug("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -412,7 +412,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug4(
+          debug(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -424,7 +424,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug4("got illegal response body from proxy");
+          debug("got illegal response body from proxy");
           socket.destroy();
           var error4 = new Error("got illegal response body from proxy");
           error4.code = "ECONNRESET";
@@ -432,13 +432,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug4("tunneling connection has established");
+        debug("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug4(
+        debug(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -500,9 +500,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug4;
+    var debug;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug4 = function() {
+      debug = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -512,10 +512,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug4 = function() {
+      debug = function() {
       };
     }
-    exports2.debug = debug4;
+    exports2.debug = debug;
   }
 });
 
@@ -17575,12 +17575,12 @@ var require_lib = __commonJS({
             throw new Error("Client has already been disposed.");
           }
           const parsedUrl = new URL(requestUrl);
-          let info5 = this._prepareRequest(verb, parsedUrl, headers);
+          let info6 = this._prepareRequest(verb, parsedUrl, headers);
           const maxTries = this._allowRetries && RetryableHttpVerbs.includes(verb) ? this._maxRetries + 1 : 1;
           let numTries = 0;
           let response;
           do {
-            response = yield this.requestRaw(info5, data);
+            response = yield this.requestRaw(info6, data);
             if (response && response.message && response.message.statusCode === HttpCodes.Unauthorized) {
               let authenticationHandler;
               for (const handler of this.handlers) {
@@ -17590,7 +17590,7 @@ var require_lib = __commonJS({
                 }
               }
               if (authenticationHandler) {
-                return authenticationHandler.handleAuthentication(this, info5, data);
+                return authenticationHandler.handleAuthentication(this, info6, data);
               } else {
                 return response;
               }
@@ -17613,8 +17613,8 @@ var require_lib = __commonJS({
                   }
                 }
               }
-              info5 = this._prepareRequest(verb, parsedRedirectUrl, headers);
-              response = yield this.requestRaw(info5, data);
+              info6 = this._prepareRequest(verb, parsedRedirectUrl, headers);
+              response = yield this.requestRaw(info6, data);
               redirectsRemaining--;
             }
             if (!response.message.statusCode || !HttpResponseRetryCodes.includes(response.message.statusCode)) {
@@ -17643,7 +17643,7 @@ var require_lib = __commonJS({
        * @param info
        * @param data
        */
-      requestRaw(info5, data) {
+      requestRaw(info6, data) {
         return __awaiter(this, void 0, void 0, function* () {
           return new Promise((resolve, reject) => {
             function callbackForResult(err, res) {
@@ -17655,7 +17655,7 @@ var require_lib = __commonJS({
                 resolve(res);
               }
             }
-            this.requestRawWithCallback(info5, data, callbackForResult);
+            this.requestRawWithCallback(info6, data, callbackForResult);
           });
         });
       }
@@ -17665,12 +17665,12 @@ var require_lib = __commonJS({
        * @param data
        * @param onResult
        */
-      requestRawWithCallback(info5, data, onResult) {
+      requestRawWithCallback(info6, data, onResult) {
         if (typeof data === "string") {
-          if (!info5.options.headers) {
-            info5.options.headers = {};
+          if (!info6.options.headers) {
+            info6.options.headers = {};
           }
-          info5.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
+          info6.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
         }
         let callbackCalled = false;
         function handleResult(err, res) {
@@ -17679,7 +17679,7 @@ var require_lib = __commonJS({
             onResult(err, res);
           }
         }
-        const req = info5.httpModule.request(info5.options, (msg) => {
+        const req = info6.httpModule.request(info6.options, (msg) => {
           const res = new HttpClientResponse(msg);
           handleResult(void 0, res);
         });
@@ -17691,7 +17691,7 @@ var require_lib = __commonJS({
           if (socket) {
             socket.end();
           }
-          handleResult(new Error(`Request timeout: ${info5.options.path}`));
+          handleResult(new Error(`Request timeout: ${info6.options.path}`));
         });
         req.on("error", function(err) {
           handleResult(err);
@@ -17727,27 +17727,27 @@ var require_lib = __commonJS({
         return this._getProxyAgentDispatcher(parsedUrl, proxyUrl);
       }
       _prepareRequest(method, requestUrl, headers) {
-        const info5 = {};
-        info5.parsedUrl = requestUrl;
-        const usingSsl = info5.parsedUrl.protocol === "https:";
-        info5.httpModule = usingSsl ? https : http;
+        const info6 = {};
+        info6.parsedUrl = requestUrl;
+        const usingSsl = info6.parsedUrl.protocol === "https:";
+        info6.httpModule = usingSsl ? https : http;
         const defaultPort = usingSsl ? 443 : 80;
-        info5.options = {};
-        info5.options.host = info5.parsedUrl.hostname;
-        info5.options.port = info5.parsedUrl.port ? parseInt(info5.parsedUrl.port) : defaultPort;
-        info5.options.path = (info5.parsedUrl.pathname || "") + (info5.parsedUrl.search || "");
-        info5.options.method = method;
-        info5.options.headers = this._mergeHeaders(headers);
+        info6.options = {};
+        info6.options.host = info6.parsedUrl.hostname;
+        info6.options.port = info6.parsedUrl.port ? parseInt(info6.parsedUrl.port) : defaultPort;
+        info6.options.path = (info6.parsedUrl.pathname || "") + (info6.parsedUrl.search || "");
+        info6.options.method = method;
+        info6.options.headers = this._mergeHeaders(headers);
         if (this.userAgent != null) {
-          info5.options.headers["user-agent"] = this.userAgent;
+          info6.options.headers["user-agent"] = this.userAgent;
         }
-        info5.options.agent = this._getAgent(info5.parsedUrl);
+        info6.options.agent = this._getAgent(info6.parsedUrl);
         if (this.handlers) {
           for (const handler of this.handlers) {
-            handler.prepareRequest(info5.options);
+            handler.prepareRequest(info6.options);
           }
         }
-        return info5;
+        return info6;
       }
       _mergeHeaders(headers) {
         if (this.requestOptions && this.requestOptions.headers) {
@@ -19721,10 +19721,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug4(message) {
+    function debug(message) {
       (0, command_1.issueCommand)("debug", {}, message);
     }
-    exports2.debug = debug4;
+    exports2.debug = debug;
     function error4(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -19737,10 +19737,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.notice = notice;
-    function info5(message) {
+    function info6(message) {
       process.stdout.write(message + os.EOL);
     }
-    exports2.info = info5;
+    exports2.info = info6;
     function startGroup4(name) {
       (0, command_1.issue)("group", name);
     }
@@ -24851,7 +24851,7 @@ var GeminiAIHelper = class {
       const promptPreview = prompt.slice(0, 400).replace(/\n/g, "\\n");
       core.startGroup("[AI][Gemini] Request");
       core.info(`model=${modelName} temperature=${this.temperature}`);
-      core.debug(`promptLength=${prompt.length} preview=${promptPreview}`);
+      core.info(`promptLength=${prompt.length} preview=${promptPreview}`);
       core.endGroup();
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const model = genAI.getGenerativeModel({
@@ -24875,8 +24875,8 @@ var GeminiAIHelper = class {
       const finishReason = response.candidates?.[0]?.finishReason || result.candidates?.[0]?.finishReason;
       core.startGroup("[AI][Gemini] Response");
       core.info(`finishReason=${finishReason}`);
-      core.debug(`usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      core.debug(`description=${text.replace(/\n/g, "\\n")}`);
+      core.info(`usage=${JSON.stringify(usage)} descLength=${text.length}`);
+      core.info(`description=${text.replace(/\n/g, "\\n")}`);
       core.endGroup();
       if (finishReason === "MAX_TOKENS") {
         core.info("[AI][Gemini] continuation: finishReason=MAX_TOKENS, requesting more...");
@@ -24893,8 +24893,8 @@ var GeminiAIHelper = class {
         const fr2 = contResp.candidates?.[0]?.finishReason;
         core.startGroup("[AI][Gemini] Continuation Response");
         core.info(`finishReason=${fr2}`);
-        core.debug(`moreLength=${more.length}`);
-        core.debug(`more=${more.replace(/\n/g, "\\n")}`);
+        core.info(`moreLength=${more.length}`);
+        core.info(`more=${more.replace(/\n/g, "\\n")}`);
         core.endGroup();
         text = (text + "\n\n" + more).trim();
       }
@@ -24922,7 +24922,7 @@ var OpenAIHelper = class {
       const promptPreview = prompt.slice(0, 400).replace(/\n/g, "\\n");
       core2.startGroup("[AI][OpenAI] Request");
       core2.info(`model=${modelName} temperature=${this.temperature}`);
-      core2.debug(`promptLength=${prompt.length} truncatedPreview=${promptPreview}`);
+      core2.info(`promptLength=${prompt.length} truncatedPreview=${promptPreview}`);
       core2.endGroup();
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -24967,8 +24967,8 @@ var OpenAIHelper = class {
       const usage = data.usage || {};
       core2.startGroup("[AI][OpenAI] Response");
       core2.info(`finishReason=${finishReason}`);
-      core2.debug(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
-      core2.debug(`description=${description.replace(/\n/g, "\\n")}`);
+      core2.info(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
+      core2.info(`description=${description.replace(/\n/g, "\\n")}`);
       core2.endGroup();
       if (finishReason === "length") {
         core2.info("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
@@ -25002,8 +25002,8 @@ var OpenAIHelper = class {
           const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
           core2.startGroup("[AI][OpenAI] Continuation Response");
           core2.info(`finishReason=${fr2}`);
-          core2.debug(`moreLength=${more.length}`);
-          core2.debug(`more=${more.replace(/\n/g, "\\n")}`);
+          core2.info(`moreLength=${more.length}`);
+          core2.info(`more=${more.replace(/\n/g, "\\n")}`);
           core2.endGroup();
           description = (description + "\n\n" + more).trim();
         } else {
@@ -25055,9 +25055,9 @@ var GitHelper = class {
       ":!**/dist/*"
     ];
     const ignoreFiles = this.ignores ? this.ignores.split(",").map((item) => `:!${item.trim()}`) : defaultIgnoreFiles;
-    core4.debug(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
+    core4.info(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
     const diffOutput = (0, import_child_process.execSync)(`git diff origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(" ")}`, { encoding: "utf8" });
-    core4.debug(`Filtered diff length: ${diffOutput.length}`);
+    core4.info(`Filtered diff length: ${diffOutput.length}`);
     return diffOutput;
   }
 };

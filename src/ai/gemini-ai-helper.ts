@@ -17,7 +17,7 @@ class GeminiAIHelper implements AIHelperInterface {
       const promptPreview = prompt.slice(0, 400).replace(/\n/g, '\\n');
       core.startGroup('[AI][Gemini] Request');
       core.info(`model=${modelName} temperature=${this.temperature}`);
-      core.debug(`promptLength=${prompt.length} preview=${promptPreview}`);
+      core.info(`promptLength=${prompt.length} preview=${promptPreview}`);
       core.endGroup();
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const model = genAI.getGenerativeModel({
@@ -42,8 +42,8 @@ class GeminiAIHelper implements AIHelperInterface {
       const finishReason = response.candidates?.[0]?.finishReason || (result as any).candidates?.[0]?.finishReason;
       core.startGroup('[AI][Gemini] Response');
       core.info(`finishReason=${finishReason}`);
-      core.debug(`usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      core.debug(`description=${text.replace(/\n/g, '\\n')}`);
+      core.info(`usage=${JSON.stringify(usage)} descLength=${text.length}`);
+      core.info(`description=${text.replace(/\n/g, '\\n')}`);
       core.endGroup();
 
       // If cut by MAX_TOKENS, request a continuation once
@@ -62,8 +62,8 @@ class GeminiAIHelper implements AIHelperInterface {
         const fr2 = contResp.candidates?.[0]?.finishReason;
         core.startGroup('[AI][Gemini] Continuation Response');
         core.info(`finishReason=${fr2}`);
-        core.debug(`moreLength=${more.length}`);
-        core.debug(`more=${more.replace(/\n/g, '\\n')}`);
+        core.info(`moreLength=${more.length}`);
+        core.info(`more=${more.replace(/\n/g, '\\n')}`);
         core.endGroup();
         text = (text + '\n\n' + more).trim();
       }
