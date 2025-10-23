@@ -19729,10 +19729,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.error = error4;
-    function warning2(message, properties = {}) {
+    function warning3(message, properties = {}) {
       (0, command_1.issueCommand)("warning", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.warning = warning2;
+    exports2.warning = warning3;
     function notice(message, properties = {}) {
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -23905,6 +23905,7 @@ var HarmCategory;
   HarmCategory2["HARM_CATEGORY_SEXUALLY_EXPLICIT"] = "HARM_CATEGORY_SEXUALLY_EXPLICIT";
   HarmCategory2["HARM_CATEGORY_HARASSMENT"] = "HARM_CATEGORY_HARASSMENT";
   HarmCategory2["HARM_CATEGORY_DANGEROUS_CONTENT"] = "HARM_CATEGORY_DANGEROUS_CONTENT";
+  HarmCategory2["HARM_CATEGORY_CIVIC_INTEGRITY"] = "HARM_CATEGORY_CIVIC_INTEGRITY";
 })(HarmCategory || (HarmCategory = {}));
 var HarmBlockThreshold;
 (function(HarmBlockThreshold2) {
@@ -23936,6 +23937,10 @@ var FinishReason;
   FinishReason2["SAFETY"] = "SAFETY";
   FinishReason2["RECITATION"] = "RECITATION";
   FinishReason2["LANGUAGE"] = "LANGUAGE";
+  FinishReason2["BLOCKLIST"] = "BLOCKLIST";
+  FinishReason2["PROHIBITED_CONTENT"] = "PROHIBITED_CONTENT";
+  FinishReason2["SPII"] = "SPII";
+  FinishReason2["MALFORMED_FUNCTION_CALL"] = "MALFORMED_FUNCTION_CALL";
   FinishReason2["OTHER"] = "OTHER";
 })(FinishReason || (FinishReason = {}));
 var TaskType;
@@ -23980,9 +23985,11 @@ var GoogleGenerativeAIFetchError = class extends GoogleGenerativeAIError {
 };
 var GoogleGenerativeAIRequestInputError = class extends GoogleGenerativeAIError {
 };
+var GoogleGenerativeAIAbortError = class extends GoogleGenerativeAIError {
+};
 var DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
 var DEFAULT_API_VERSION = "v1beta";
-var PACKAGE_VERSION = "0.21.0";
+var PACKAGE_VERSION = "0.24.1";
 var PACKAGE_LOG_HEADER = "genai-js";
 var Task;
 (function(Task2) {
@@ -24070,7 +24077,10 @@ async function makeRequest(url, fetchOptions, fetchFn = fetch) {
 }
 function handleResponseError(e, url) {
   let err = e;
-  if (!(e instanceof GoogleGenerativeAIFetchError || e instanceof GoogleGenerativeAIRequestInputError)) {
+  if (err.name === "AbortError") {
+    err = new GoogleGenerativeAIAbortError(`Request aborted when fetching ${url.toString()}: ${e.message}`);
+    err.stack = e.stack;
+  } else if (!(e instanceof GoogleGenerativeAIFetchError || e instanceof GoogleGenerativeAIRequestInputError)) {
     err = new GoogleGenerativeAIError(`Error fetching from ${url.toString()}: ${e.message}`);
     err.stack = e.stack;
   }
@@ -24320,6 +24330,15 @@ function getResponseStream(inputStream) {
             match = currentText.match(responseLineRE);
           }
           return pump();
+        }).catch((e) => {
+          let err = e;
+          err.stack = e.stack;
+          if (err.name === "AbortError") {
+            err = new GoogleGenerativeAIAbortError("Request aborted when reading from the stream");
+          } else {
+            err = new GoogleGenerativeAIError("Error reading from the stream");
+          }
+          throw err;
         });
       }
     }
@@ -24333,24 +24352,24 @@ function aggregateResponses(responses) {
   };
   for (const response of responses) {
     if (response.candidates) {
+      let candidateIndex = 0;
       for (const candidate of response.candidates) {
-        const i = candidate.index;
         if (!aggregatedResponse.candidates) {
           aggregatedResponse.candidates = [];
         }
-        if (!aggregatedResponse.candidates[i]) {
-          aggregatedResponse.candidates[i] = {
-            index: candidate.index
+        if (!aggregatedResponse.candidates[candidateIndex]) {
+          aggregatedResponse.candidates[candidateIndex] = {
+            index: candidateIndex
           };
         }
-        aggregatedResponse.candidates[i].citationMetadata = candidate.citationMetadata;
-        aggregatedResponse.candidates[i].groundingMetadata = candidate.groundingMetadata;
-        aggregatedResponse.candidates[i].finishReason = candidate.finishReason;
-        aggregatedResponse.candidates[i].finishMessage = candidate.finishMessage;
-        aggregatedResponse.candidates[i].safetyRatings = candidate.safetyRatings;
+        aggregatedResponse.candidates[candidateIndex].citationMetadata = candidate.citationMetadata;
+        aggregatedResponse.candidates[candidateIndex].groundingMetadata = candidate.groundingMetadata;
+        aggregatedResponse.candidates[candidateIndex].finishReason = candidate.finishReason;
+        aggregatedResponse.candidates[candidateIndex].finishMessage = candidate.finishMessage;
+        aggregatedResponse.candidates[candidateIndex].safetyRatings = candidate.safetyRatings;
         if (candidate.content && candidate.content.parts) {
-          if (!aggregatedResponse.candidates[i].content) {
-            aggregatedResponse.candidates[i].content = {
+          if (!aggregatedResponse.candidates[candidateIndex].content) {
+            aggregatedResponse.candidates[candidateIndex].content = {
               role: candidate.content.role || "user",
               parts: []
             };
@@ -24372,10 +24391,11 @@ function aggregateResponses(responses) {
             if (Object.keys(newPart).length === 0) {
               newPart.text = "";
             }
-            aggregatedResponse.candidates[i].content.parts.push(newPart);
+            aggregatedResponse.candidates[candidateIndex].content.parts.push(newPart);
           }
         }
       }
+      candidateIndex++;
     }
     if (response.usageMetadata) {
       aggregatedResponse.usageMetadata = response.usageMetadata;
@@ -24568,6 +24588,28 @@ function validateChatHistory(history) {
     prevContent = true;
   }
 }
+function isValidResponse(response) {
+  var _a;
+  if (response.candidates === void 0 || response.candidates.length === 0) {
+    return false;
+  }
+  const content = (_a = response.candidates[0]) === null || _a === void 0 ? void 0 : _a.content;
+  if (content === void 0) {
+    return false;
+  }
+  if (content.parts === void 0 || content.parts.length === 0) {
+    return false;
+  }
+  for (const part of content.parts) {
+    if (part === void 0 || Object.keys(part).length === 0) {
+      return false;
+    }
+    if (part.text !== void 0 && part.text === "") {
+      return false;
+    }
+  }
+  return true;
+}
 var SILENT_ERROR = "SILENT_ERROR";
 var ChatSession = class {
   constructor(apiKey, model, params, _requestOptions = {}) {
@@ -24616,7 +24658,7 @@ var ChatSession = class {
     let finalResult;
     this._sendPromise = this._sendPromise.then(() => generateContent(this._apiKey, this.model, generateContentRequest, chatSessionRequestOptions)).then((result) => {
       var _a2;
-      if (result.response.candidates && result.response.candidates.length > 0) {
+      if (isValidResponse(result.response)) {
         this._history.push(newContent);
         const responseContent = Object.assign({
           parts: [],
@@ -24631,6 +24673,9 @@ var ChatSession = class {
         }
       }
       finalResult = result;
+    }).catch((e) => {
+      this._sendPromise = Promise.resolve();
+      throw e;
     });
     await this._sendPromise;
     return finalResult;
@@ -24662,7 +24707,7 @@ var ChatSession = class {
     this._sendPromise = this._sendPromise.then(() => streamPromise).catch((_ignored) => {
       throw new Error(SILENT_ERROR);
     }).then((streamResult) => streamResult.response).then((response) => {
-      if (response.candidates && response.candidates.length > 0) {
+      if (isValidResponse(response)) {
         this._history.push(newContent);
         const responseContent = Object.assign({}, response.candidates[0].content);
         if (!responseContent.role) {
@@ -24876,7 +24921,19 @@ ${prompt}` : prompt }] }
         }
       });
       const response = result.response;
-      let text = response.text();
+      let text = "";
+      try {
+        text = response.text();
+      } catch (e) {
+        core.warning(`[AI][Gemini] response.text() failed: ${e?.message || e}`);
+        try {
+          const parts = response?.candidates?.[0]?.content?.parts || [];
+          text = parts.map((p) => p?.text || "").join("");
+        } catch (aggErr) {
+          core.warning(`[AI][Gemini] fallback aggregate parts failed: ${aggErr?.message || aggErr}`);
+          throw e;
+        }
+      }
       const usage = response.usageMetadata || result.usageMetadata || void 0;
       const finishReason = response.candidates?.[0]?.finishReason || result.candidates?.[0]?.finishReason;
       core.startGroup("[AI][Gemini] Response");
@@ -24908,8 +24965,10 @@ ${more}`);
       }
       return text;
     } catch (error4) {
-      core.error(`[AI][Gemini] exception message=${error4.message}`);
-      throw new Error(`Gemini API Error: ${error4.message}`);
+      const err = error4;
+      core.error(`[AI][Gemini] exception message=${err.message}`);
+      if (err.stack) core.error(`[AI][Gemini] stack=${err.stack}`);
+      throw new Error(`Gemini API Error: ${err.message}`);
     }
   }
 };

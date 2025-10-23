@@ -21,7 +21,7 @@ class GeminiAIHelper implements AIHelperInterface {
       core.info(`model=${modelName} temperature=${this.temperature} maxOutputTokens=${maxOutputTokens}`);
       core.info(`promptLength=${prompt.length}`);
       core.info(`promptPreview:\n${promptPreview}`);
-      core.endGroup();s
+      core.endGroup();
 
       const systemText = 'You are very good at reviewing code and can generate pull request descriptions.';
       const genAI = new GoogleGenerativeAI(this.apiKey);
