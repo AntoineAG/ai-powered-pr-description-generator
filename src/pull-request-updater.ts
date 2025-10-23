@@ -20,9 +20,14 @@ class PullRequestUpdater {
     const temperature = Number.parseFloat(getInput('temperature') || '0.8');
 
     this.aiHelper = aiHelperResolver({ apiKey, aiName, temperature, model });
+    console.log('[Desc] AI configured', { aiName, model, temperature });
     
     const githubToken = getInput('github_token', { required: true }).trim();
     this.octokit = getOctokit(githubToken);  
+  }
+
+  private previewStr(text: string, max = 400): string {
+    try { return (text || '').slice(0, max).replace(/\n/g, '\\n'); } catch { return ''; }
   }
 
   private generatePrompt(diffOutput: string, creator: string): string {
@@ -60,11 +65,16 @@ class PullRequestUpdater {
 
       // Get the diff and generate the PR description
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
+      console.log('[Desc] diff stats', { length: diffOutput.length });
       const prompt = this.generatePrompt(diffOutput, creator);
+      console.log('[Desc] prompt prepared', { length: prompt.length, preview: this.previewStr(prompt) });
+      console.log('[Desc] calling AI to generate description...');
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
+      console.log('[Desc] AI response (description)', { length: generatedDescription.length, preview: this.previewStr(generatedDescription, 300) });
 
       // Update the pull request description
-        await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
+      console.log('[Desc] updating pull request with new description', { pr: pullRequestNumber, descriptionLength: generatedDescription.length });
+      await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
 
       // Set outputs for GitHub Actions
         setOutput('pr_number', pullRequestNumber.toString());
@@ -72,7 +82,7 @@ class PullRequestUpdater {
 
       console.log(`Successfully updated PR #${pullRequestNumber} description.`);
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setFailed(errorMessage);
       console.error(`Error updating PR: ${errorMessage}`);
     }
@@ -97,7 +107,7 @@ class PullRequestUpdater {
     try {
       // Fetch pull request details
       const pullRequest = await this.fetchPullRequestDetails(pullRequestNumber);
-        const currentDescription = pullRequest.body || '';
+      const currentDescription = pullRequest.body || '';
 
       // Post a comment with the original description if it exists
       if (currentDescription) {
@@ -107,8 +117,9 @@ class PullRequestUpdater {
         );
       }
 
+      console.log('[Desc] will apply new description', { prevLength: currentDescription.length, newLength: generatedDescription.length, newPreview: this.previewStr(generatedDescription, 200) });
       // Apply the new pull request description
-        await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
+      await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
     } catch (error) {
       // Log the error and rethrow it for higher-level handling
       console.error(

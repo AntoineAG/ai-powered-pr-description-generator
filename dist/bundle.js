@@ -24840,9 +24840,10 @@ var GeminiAIHelper = class {
   }
   async createPullRequestDescription(diffOutput, prompt) {
     try {
-      console.log("call gemini Ai");
+      const modelName = this.model?.trim() || "gemini-1.5-pro";
+      const promptPreview = prompt.slice(0, 400).replace(/\n/g, "\\n");
+      console.log("[AI][Gemini] request ->", { model: modelName, temperature: this.temperature, promptLength: prompt.length, promptPreview });
       const genAI = new GoogleGenerativeAI(this.apiKey);
-      const modelName = this.model?.trim() || "gemini-2.5-flash";
       const model = genAI.getGenerativeModel({
         model: modelName,
         // Provide instructions via systemInstruction instead of an invalid role
@@ -24855,12 +24856,33 @@ var GeminiAIHelper = class {
         ],
         generationConfig: {
           temperature: this.temperature,
-          maxOutputTokens: 1024
+          maxOutputTokens: 2048
         }
       });
       const response = result.response;
-      return response.text();
+      let text = response.text();
+      const usage = response.usageMetadata || result.usageMetadata || void 0;
+      const finishReason = response.candidates?.[0]?.finishReason || result.candidates?.[0]?.finishReason;
+      console.log("[AI][Gemini] response ->", { finishReason, usage, descriptionLength: text.length, descriptionPreview: text.slice(0, 200).replace(/\n/g, "\\n") });
+      if (finishReason === "MAX_TOKENS") {
+        console.log("[AI][Gemini] continuation: finishReason=MAX_TOKENS, requesting more...");
+        const cont = await model.generateContent({
+          contents: [
+            { role: "user", parts: [{ text: prompt }] },
+            { role: "model", parts: [{ text }] },
+            { role: "user", parts: [{ text: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }] }
+          ],
+          generationConfig: { temperature: this.temperature, maxOutputTokens: 1024 }
+        });
+        const contResp = cont.response;
+        const more = contResp.text();
+        const fr2 = contResp.candidates?.[0]?.finishReason;
+        console.log("[AI][Gemini] continuation response ->", { finishReason: fr2, moreLength: more.length, morePreview: more.slice(0, 200).replace(/\n/g, "\\n") });
+        text = (text + "\n\n" + more).trim();
+      }
+      return text;
     } catch (error) {
+      console.error("[AI][Gemini] exception", { message: error.message });
       throw new Error(`Gemini API Error: ${error.message}`);
     }
   }
@@ -24877,7 +24899,9 @@ var OpenAIHelper = class {
   }
   async createPullRequestDescription(diffOutput, prompt) {
     try {
-      console.log("call open ai");
+      const modelName = this.model?.trim() || "gpt-4.1";
+      const promptPreview = prompt.slice(0, 400).replace(/\n/g, "\\n");
+      console.log("[AI][OpenAI] request ->", { model: modelName, temperature: this.temperature, promptLength: prompt.length, promptPreview });
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -24885,7 +24909,7 @@ var OpenAIHelper = class {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: this.model?.trim() || "gpt-4.1",
+          model: modelName,
           messages: [
             {
               role: "system",
@@ -24897,16 +24921,68 @@ var OpenAIHelper = class {
             }
           ],
           temperature: this.temperature,
-          max_tokens: 1024
+          max_tokens: 2048
         })
       });
-      const data = await response.json();
+      const raw = await response.text();
+      if (!response.ok) {
+        console.error("[AI][OpenAI] http_error", { status: response.status, bodyPreview: raw.slice(0, 400) });
+        throw new Error(`OpenAI API HTTP ${response.status}: ${raw.slice(0, 200)}`);
+      }
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch (e) {
+        console.error("[AI][OpenAI] parse_error", { rawPreview: raw.slice(0, 400) });
+        throw e;
+      }
       if (data.error) {
+        console.error("[AI][OpenAI] api_error", { error: data.error });
         throw new Error(`OpenAI API Error: ${data.error.message}`);
       }
-      const description = data.choices[0].message.content.trim();
+      let description = (data.choices?.[0]?.message?.content || "").trim();
+      const finishReason = data.choices?.[0]?.finish_reason || data.choices?.[0]?.finishReason;
+      const usage = data.usage || {};
+      console.log("[AI][OpenAI] response ->", { finishReason, usage, descriptionLength: description.length, descriptionPreview: description.slice(0, 200).replace(/\n/g, "\\n") });
+      if (finishReason === "length") {
+        console.log("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
+        const contResp = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [
+              { role: "system", content: "You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions." },
+              { role: "user", content: prompt },
+              { role: "assistant", content: description },
+              { role: "user", content: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }
+            ],
+            temperature: this.temperature,
+            max_tokens: 1024
+          })
+        });
+        const contRaw = await contResp.text();
+        if (contResp.ok) {
+          let contData;
+          try {
+            contData = JSON.parse(contRaw);
+          } catch {
+            contData = {};
+          }
+          const more = (contData.choices?.[0]?.message?.content || "").trim();
+          const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
+          console.log("[AI][OpenAI] continuation response ->", { finishReason: fr2, moreLength: more.length, morePreview: more.slice(0, 200).replace(/\n/g, "\\n") });
+          description = (description + "\n\n" + more).trim();
+        } else {
+          console.warn("[AI][OpenAI] continuation failed", { status: contResp.status, bodyPreview: contRaw.slice(0, 200) });
+        }
+      }
       return description;
     } catch (error) {
+      console.error("[AI][OpenAI] exception", { message: error.message });
       throw new Error(`OpenAI API Error: ${error.message}`);
     }
   }
@@ -24915,7 +24991,8 @@ var open_ai_helper_default = OpenAIHelper;
 
 // src/ai/ai-helper-resolver.ts
 var aiHelperResolver = (aiHelperParams) => {
-  const { aiName } = aiHelperParams;
+  const { aiName, model, temperature } = aiHelperParams;
+  console.log("[AI] Resolver ->", { aiName, model, temperature });
   switch (aiName) {
     case "open-ai":
     case "openai":
@@ -24968,8 +25045,16 @@ var PullRequestUpdater = class {
     const apiKey = (0, import_core.getInput)("api_key", { required: true }).trim();
     const temperature = Number.parseFloat((0, import_core.getInput)("temperature") || "0.8");
     this.aiHelper = ai_helper_resolver_default({ apiKey, aiName, temperature, model });
+    console.log("[Desc] AI configured", { aiName, model, temperature });
     const githubToken = (0, import_core.getInput)("github_token", { required: true }).trim();
     this.octokit = (0, import_github.getOctokit)(githubToken);
+  }
+  previewStr(text, max = 400) {
+    try {
+      return (text || "").slice(0, max).replace(/\n/g, "\\n");
+    } catch {
+      return "";
+    }
   }
   generatePrompt(diffOutput, creator) {
     return `Instructions:
@@ -24998,8 +25083,13 @@ var PullRequestUpdater = class {
       this.gitHelper.setupGitConfiguration();
       await this.gitHelper.fetchGitBranches(baseBranch, headBranch);
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
+      console.log("[Desc] diff stats", { length: diffOutput.length });
       const prompt = this.generatePrompt(diffOutput, creator);
+      console.log("[Desc] prompt prepared", { length: prompt.length, preview: this.previewStr(prompt) });
+      console.log("[Desc] calling AI to generate description...");
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
+      console.log("[Desc] AI response (description)", { length: generatedDescription.length, preview: this.previewStr(generatedDescription, 300) });
+      console.log("[Desc] updating pull request with new description", { pr: pullRequestNumber, descriptionLength: generatedDescription.length });
       await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
       (0, import_core.setOutput)("pr_number", pullRequestNumber.toString());
       (0, import_core.setOutput)("description", generatedDescription);
@@ -25033,6 +25123,7 @@ var PullRequestUpdater = class {
           currentDescription
         );
       }
+      console.log("[Desc] will apply new description", { prevLength: currentDescription.length, newLength: generatedDescription.length, newPreview: this.previewStr(generatedDescription, 200) });
       await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
     } catch (error) {
       console.error(
