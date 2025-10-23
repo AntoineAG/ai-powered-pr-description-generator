@@ -14,9 +14,8 @@ class GeminiAIHelper implements AIHelperInterface {
   async createPullRequestDescription(diffOutput: string, prompt: string): Promise<string> {
     try {
       const modelName = this.model?.trim() || 'gemini-2.5-flash';
-      // const maxTokensEnv = Number.parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || '', 10);
-      // const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? maxTokensEnv : 2048;
-      const maxOutputTokens = 20;
+      const maxTokensEnv = Number.parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || '', 10);
+      const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? maxTokensEnv : 2048;
       const promptPreview = prompt.length > 2000 ? `${prompt.slice(0, 2000)}[...]` : prompt;
       core.startGroup('[AI][Gemini] Request');
       core.info(`model=${modelName} temperature=${this.temperature} maxOutputTokens=${maxOutputTokens}`);
