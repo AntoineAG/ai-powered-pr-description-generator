@@ -392,7 +392,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug5("making CONNECT request");
+      debug4("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -412,7 +412,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug5(
+          debug4(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -424,7 +424,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug5("got illegal response body from proxy");
+          debug4("got illegal response body from proxy");
           socket.destroy();
           var error4 = new Error("got illegal response body from proxy");
           error4.code = "ECONNRESET";
@@ -432,13 +432,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug5("tunneling connection has established");
+        debug4("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug5(
+        debug4(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -500,9 +500,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug5;
+    var debug4;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug5 = function() {
+      debug4 = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -512,10 +512,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug5 = function() {
+      debug4 = function() {
       };
     }
-    exports2.debug = debug5;
+    exports2.debug = debug4;
   }
 });
 
@@ -19721,10 +19721,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug5(message) {
+    function debug4(message) {
       (0, command_1.issueCommand)("debug", {}, message);
     }
-    exports2.debug = debug5;
+    exports2.debug = debug4;
     function error4(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -25076,7 +25076,7 @@ var PullRequestUpdater = class {
     const apiKey = (0, import_core.getInput)("api_key", { required: true }).trim();
     const temperature = Number.parseFloat((0, import_core.getInput)("temperature") || "0.8");
     this.aiHelper = ai_helper_resolver_default({ apiKey, aiName, temperature, model });
-    core5.info(`[Desc] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
+    core5.info(`[PR-Description] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
     const githubToken = (0, import_core.getInput)("github_token", { required: true }).trim();
     this.octokit = (0, import_github.getOctokit)(githubToken);
   }
@@ -25115,18 +25115,18 @@ var PullRequestUpdater = class {
       await this.gitHelper.fetchGitBranches(baseBranch, headBranch);
       core5.startGroup("Diff and Prompt");
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
-      core5.debug(`[Desc] diff length=${diffOutput.length}`);
+      core5.info(`[PR-Description] diff length=${diffOutput.length}`);
       const prompt = this.generatePrompt(diffOutput, creator);
-      core5.debug(`[Desc] prompt length=${prompt.length}`);
+      core5.info(`[PR-Description] prompt length=${prompt.length}`);
       core5.endGroup();
       core5.startGroup("AI Generation");
-      core5.info("[Desc] calling AI to generate description");
+      core5.info("[PR-Description] calling AI to generate description");
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
-      core5.debug(`[Desc] AI description length=${generatedDescription.length}`);
-      core5.debug(`[Desc] AI description content=${generatedDescription.replace(/\n/g, "\\n")}`);
+      core5.info(`[PR-Description] AI description length=${generatedDescription.length}`);
+      core5.info(`[PR-Description] AI description content=${generatedDescription.replace(/\n/g, "\\n")}`);
       core5.endGroup();
       core5.startGroup("PR Update");
-      core5.info(`[Desc] updating pull request #${pullRequestNumber}`);
+      core5.info(`[PR-Description] updating pull request #${pullRequestNumber}`);
       await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
       core5.endGroup();
       (0, import_core.setOutput)("pr_number", pullRequestNumber.toString());
@@ -25160,8 +25160,8 @@ var PullRequestUpdater = class {
           currentDescription
         );
       }
-      core5.debug(`[Desc] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
-      core5.debug(`[Desc] new description content=${generatedDescription.replace(/\n/g, "\\n")}`);
+      core5.info(`[PR-Description] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
+      core5.info(`[PR-Description] new description content=${generatedDescription.replace(/\n/g, "\\n")}`);
       await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
     } catch (error4) {
       core5.error(`Error updating PR #${pullRequestNumber} description: ${error4.message}`);

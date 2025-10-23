@@ -21,7 +21,7 @@ class PullRequestUpdater {
     const temperature = Number.parseFloat(getInput('temperature') || '0.8');
 
     this.aiHelper = aiHelperResolver({ apiKey, aiName, temperature, model });
-    core.info(`[Desc] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
+    core.info(`[PR-Description] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
     
     const githubToken = getInput('github_token', { required: true }).trim();
     this.octokit = getOctokit(githubToken);  
@@ -67,20 +67,20 @@ class PullRequestUpdater {
       // Get the diff and generate the PR description
       core.startGroup('Diff and Prompt');
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
-      core.debug(`[Desc] diff length=${diffOutput.length}`);
+      core.info(`[PR-Description] diff length=${diffOutput.length}`);
       const prompt = this.generatePrompt(diffOutput, creator);
-      core.debug(`[Desc] prompt length=${prompt.length}`);
+      core.info(`[PR-Description] prompt length=${prompt.length}`);
       core.endGroup();
       core.startGroup('AI Generation');
-      core.info('[Desc] calling AI to generate description');
+      core.info('[PR-Description] calling AI to generate description');
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
-      core.debug(`[Desc] AI description length=${generatedDescription.length}`);
-      core.debug(`[Desc] AI description content=${generatedDescription.replace(/\n/g, '\\n')}`);
+      core.info(`[PR-Description] AI description length=${generatedDescription.length}`);
+      core.info(`[PR-Description] AI description content=${generatedDescription.replace(/\n/g, '\\n')}`);
       core.endGroup();
 
       // Update the pull request description
       core.startGroup('PR Update');
-      core.info(`[Desc] updating pull request #${pullRequestNumber}`);
+      core.info(`[PR-Description] updating pull request #${pullRequestNumber}`);
       await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
       core.endGroup();
 
@@ -123,8 +123,8 @@ class PullRequestUpdater {
         );
       }
 
-      core.debug(`[Desc] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
-      core.debug(`[Desc] new description content=${generatedDescription.replace(/\n/g, '\\n')}`);
+      core.info(`[PR-Description] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
+      core.info(`[PR-Description] new description content=${generatedDescription.replace(/\n/g, '\\n')}`);
       // Apply the new pull request description
       await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
     } catch (error) {
