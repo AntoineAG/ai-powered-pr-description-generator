@@ -54,6 +54,9 @@ Before using the generator, you need to configure the following secrets in your 
 
 GITHUB_TOKEN should be required (https://github.com/settings/tokens), it needs permission to modify the pull request.
 
+Optional environment variables:
+- `GEMINI_MAX_OUTPUT_TOKENS`: Overrides Gemini `maxOutputTokens` for responses. Useful for testing truncation/continuation. Example: set to `20` to force a short first response and trigger a continuation.
+
 ### Action Inputs
 - `ai_name` (required): Which provider to use. Supported: `gemini`, `open-ai`.
 - `api_key` (required): API key for the selected provider.

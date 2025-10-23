@@ -24847,27 +24847,31 @@ var GeminiAIHelper = class {
   }
   async createPullRequestDescription(diffOutput, prompt) {
     try {
-      const modelName = this.model?.trim() || "gemini-1.5-pro";
+      const modelName = this.model?.trim() || "gemini-2.5-flash";
+      const maxTokensEnv = Number.parseInt(process.env.GEMINI_MAX_OUTPUT_TOKENS || "", 10);
+      const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? maxTokensEnv : 2048;
       const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
       core.startGroup("[AI][Gemini] Request");
-      core.info(`model=${modelName} temperature=${this.temperature}`);
-      core.info(`promptLength=${prompt.length} truncatedPreview:
+      core.info(`model=${modelName} temperature=${this.temperature} maxOutputTokens=${maxOutputTokens}`);
+      core.info(`promptLength=${prompt.length}`);
+      core.info(`promptPreview:
 ${promptPreview}`);
       core.endGroup();
+      const systemText = "You are very good at reviewing code and can generate pull request descriptions.";
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const model = genAI.getGenerativeModel({
         model: modelName,
-        // Provide instructions via systemInstruction instead of an invalid role
-        systemInstruction: "You are very good at reviewing code and can generate pull request descriptions"
+        ...modelName.toLocaleLowerCase().startsWith("gemini-2") ? { systemInstruction: systemText } : {}
       });
       const result = await model.generateContent({
         contents: [
-          // Gemini only allows roles: 'user' and 'model'. Keep a single user turn.
-          { role: "user", parts: [{ text: prompt }] }
+          { role: "user", parts: [{ text: !modelName.toLocaleLowerCase().startsWith("gemini-2") ? `${systemText}
+
+${prompt}` : prompt }] }
         ],
         generationConfig: {
           temperature: this.temperature,
-          maxOutputTokens: 2048
+          maxOutputTokens
         }
       });
       const response = result.response;
@@ -24888,7 +24892,7 @@ ${text}`);
             { role: "model", parts: [{ text }] },
             { role: "user", parts: [{ text: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }] }
           ],
-          generationConfig: { temperature: this.temperature, maxOutputTokens: 1024 }
+          generationConfig: { temperature: this.temperature, maxOutputTokens }
         });
         const contResp = cont.response;
         const more = contResp.text();
@@ -24925,7 +24929,8 @@ var OpenAIHelper = class {
       const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
       core2.startGroup("[AI][OpenAI] Request");
       core2.info(`model=${modelName} temperature=${this.temperature}`);
-      core2.info(`promptLength=${prompt.length} truncatedPreview:
+      core2.info(`promptLength=${prompt.length}`);
+      core2.info(`truncatedPreview:
 ${promptPreview}`);
       core2.endGroup();
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
