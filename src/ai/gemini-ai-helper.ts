@@ -20,16 +20,16 @@ class GeminiAIHelper implements AIHelperInterface {
       core.info(`promptLength=${prompt.length}`);
       core.info(`promptPreview:\n${promptPreview}`);
       core.endGroup();
+
+      const systemText = 'You are very good at reviewing code and can generate pull request descriptions.';
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const model = genAI.getGenerativeModel({
         model: modelName,
-        // Provide instructions via systemInstruction instead of an invalid role
-        systemInstruction: "You are very good at reviewing code and can generate pull request descriptions"
+        ...(modelName.toLocaleLowerCase().startsWith('gemini-2') ? { systemInstruction: systemText } : {}),
       });
       const result = await model.generateContent({
         contents: [
-          // Gemini only allows roles: 'user' and 'model'. Keep a single user turn.
-          { role: "user", parts: [{ text: prompt }] }
+          { role: "user", parts: [{ text: !modelName.toLocaleLowerCase().startsWith('gemini-2') ? `${systemText}\n\n${prompt}` : prompt }] }
         ],
         generationConfig: {
           temperature: this.temperature,
