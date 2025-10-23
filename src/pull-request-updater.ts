@@ -1,3 +1,4 @@
+import * as core from '@actions/core';
 import { getInput, setFailed, setOutput } from '@actions/core';
 import { context, getOctokit } from '@actions/github';
 import aiHelperResolver from './ai/ai-helper-resolver';
@@ -20,7 +21,7 @@ class PullRequestUpdater {
     const temperature = Number.parseFloat(getInput('temperature') || '0.8');
 
     this.aiHelper = aiHelperResolver({ apiKey, aiName, temperature, model });
-    console.log('[Desc] AI configured', { aiName, model, temperature });
+    core.info(`[Desc] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
     
     const githubToken = getInput('github_token', { required: true }).trim();
     this.octokit = getOctokit(githubToken);  
@@ -64,27 +65,31 @@ class PullRequestUpdater {
       await this.gitHelper.fetchGitBranches(baseBranch, headBranch);
 
       // Get the diff and generate the PR description
+      core.startGroup('Diff and Prompt');
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
-      console.log('[Desc] diff stats', { length: diffOutput.length });
+      core.debug(`[Desc] diff length=${diffOutput.length}`);
       const prompt = this.generatePrompt(diffOutput, creator);
-      console.log('[Desc] prompt prepared', { length: prompt.length, preview: this.previewStr(prompt) });
-      console.log('[Desc] calling AI to generate description...');
+      core.debug(`[Desc] prompt length=${prompt.length}`);
+      core.endGroup();
+      core.startGroup('AI Generation');
+      core.info('[Desc] calling AI to generate description');
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
-      console.log('[Desc] AI response (description)', { length: generatedDescription.length, preview: this.previewStr(generatedDescription, 300) });
+      core.debug(`[Desc] AI description length=${generatedDescription.length}`);
+      core.endGroup();
 
       // Update the pull request description
-      console.log('[Desc] updating pull request with new description', { pr: pullRequestNumber, descriptionLength: generatedDescription.length });
+      core.startGroup('PR Update');
+      core.info(`[Desc] updating pull request #${pullRequestNumber}`);
       await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
+      core.endGroup();
 
       // Set outputs for GitHub Actions
-        setOutput('pr_number', pullRequestNumber.toString());
-        setOutput('description', generatedDescription);
-
-      console.log(`Successfully updated PR #${pullRequestNumber} description.`);
+      setOutput('pr_number', pullRequestNumber.toString());
+      setOutput('description', generatedDescription);
+      core.info(`Successfully updated PR #${pullRequestNumber} description.`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setFailed(errorMessage);
-      console.error(`Error updating PR: ${errorMessage}`);
+      core.setFailed(errorMessage);
     }
   }
 
@@ -98,8 +103,8 @@ class PullRequestUpdater {
   extractBranchRefs() {
     const baseBranch = this.context.payload.pull_request.base.ref;
     const headBranch = this.context.payload.pull_request.head.ref;
-    console.log(`Base branch: ${baseBranch}`);
-    console.log(`Head branch: ${headBranch}`);
+    core.info(`Base branch: ${baseBranch}`);
+    core.info(`Head branch: ${headBranch}`);
     return { baseBranch, headBranch };
   }
 
@@ -117,15 +122,12 @@ class PullRequestUpdater {
         );
       }
 
-      console.log('[Desc] will apply new description', { prevLength: currentDescription.length, newLength: generatedDescription.length, newPreview: this.previewStr(generatedDescription, 200) });
+      core.debug(`[Desc] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
       // Apply the new pull request description
       await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
     } catch (error) {
       // Log the error and rethrow it for higher-level handling
-      console.error(
-        `Error updating PR #${pullRequestNumber} description:`,
-        error
-      );
+      core.error(`Error updating PR #${pullRequestNumber} description: ${(error as Error).message}`);
       throw error;
     }
   };
@@ -147,25 +149,25 @@ class PullRequestUpdater {
     pullRequestNumber: number,
     currentDescription: string
   ) {
-    console.log('Creating comment with original description...');
+    core.info('Creating comment with original description...');
     await this.octokit.rest.issues.createComment({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       issue_number: pullRequestNumber,
       body: `**Original description**:\n\n${currentDescription}`
     });
-    console.log('Comment created successfully.');
+    core.info('Comment created successfully.');
   }
 
   async applyPullRequestUpdate(pullRequestNumber: number, newDescription: string) {
-    console.log('Updating PR description...');
+    core.info('Updating PR description...');
     await this.octokit.rest.pulls.update({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       pull_number: pullRequestNumber,
       body: newDescription,
     });
-    console.log('PR description updated successfully.');
+    core.info('PR description updated successfully.');
   }
 }
 

@@ -1,3 +1,4 @@
+import * as core from '@actions/core';
 import { execSync } from 'child_process';
 
 export class GitHelper {
@@ -27,12 +28,12 @@ export class GitHelper {
           ? this.ignores.split(',').map(item => `:!${item.trim()}`) // Trim whitespace from items
           : defaultIgnoreFiles;
   
-      console.log("Ignore files:", JSON.stringify(ignoreFiles));
+      core.debug(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
   
       // Execute the git diff command and get the output
       const diffOutput = execSync(`git diff origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(' ')}`, { encoding: 'utf8' });
       
-      console.log('Filtered diff output:', diffOutput);
+      core.debug(`Filtered diff length: ${diffOutput.length}`);
       return diffOutput;
   }
 }

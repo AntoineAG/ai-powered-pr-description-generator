@@ -1,3 +1,4 @@
+import * as core from '@actions/core';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AIHelperInterface, AIHelperParams } from './types';
 
@@ -14,7 +15,10 @@ class GeminiAIHelper implements AIHelperInterface {
     try {
       const modelName = this.model?.trim() || 'gemini-1.5-pro';
       const promptPreview = prompt.slice(0, 400).replace(/\n/g, '\\n');
-      console.log('[AI][Gemini] request ->', { model: modelName, temperature: this.temperature, promptLength: prompt.length, promptPreview });
+      core.startGroup('[AI][Gemini] Request');
+      core.info(`model=${modelName} temperature=${this.temperature}`);
+      core.debug(`promptLength=${prompt.length} preview=${promptPreview}`);
+      core.endGroup();
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const model = genAI.getGenerativeModel({
         model: modelName,
@@ -36,11 +40,14 @@ class GeminiAIHelper implements AIHelperInterface {
       let text = response.text();
       const usage = response.usageMetadata || (result as any).usageMetadata || undefined;
       const finishReason = response.candidates?.[0]?.finishReason || (result as any).candidates?.[0]?.finishReason;
-      console.log('[AI][Gemini] response ->', { finishReason, usage, descriptionLength: text.length, descriptionPreview: text.slice(0, 200).replace(/\n/g, '\\n') });
+      core.startGroup('[AI][Gemini] Response');
+      core.info(`finishReason=${finishReason}`);
+      core.debug(`usage=${JSON.stringify(usage)} descLength=${text.length} preview=${text.slice(0, 200).replace(/\n/g, '\\n')}`);
+      core.endGroup();
 
       // If cut by MAX_TOKENS, request a continuation once
       if (finishReason === 'MAX_TOKENS') {
-        console.log('[AI][Gemini] continuation: finishReason=MAX_TOKENS, requesting more...');
+        core.info('[AI][Gemini] continuation: finishReason=MAX_TOKENS, requesting more...');
         const cont = await model.generateContent({
           contents: [
             { role: 'user', parts: [{ text: prompt }] },
@@ -52,13 +59,16 @@ class GeminiAIHelper implements AIHelperInterface {
         const contResp: any = cont.response;
         const more = contResp.text();
         const fr2 = contResp.candidates?.[0]?.finishReason;
-        console.log('[AI][Gemini] continuation response ->', { finishReason: fr2, moreLength: more.length, morePreview: more.slice(0, 200).replace(/\n/g, '\\n') });
+        core.startGroup('[AI][Gemini] Continuation Response');
+        core.info(`finishReason=${fr2}`);
+        core.debug(`moreLength=${more.length} morePreview=${more.slice(0, 200).replace(/\n/g, '\\n')}`);
+        core.endGroup();
         text = (text + '\n\n' + more).trim();
       }
 
       return text;
     } catch (error) {
-      console.error('[AI][Gemini] exception', { message: (error as Error).message });
+      core.error(`[AI][Gemini] exception message=${(error as Error).message}`);
       throw new Error(`Gemini API Error: ${(error as Error).message}`);
     }
   }

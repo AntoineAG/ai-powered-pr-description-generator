@@ -392,7 +392,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug("making CONNECT request");
+      debug5("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -412,40 +412,40 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug(
+          debug5(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
           socket.destroy();
-          var error = new Error("tunneling socket could not be established, statusCode=" + res.statusCode);
-          error.code = "ECONNRESET";
-          options.request.emit("error", error);
+          var error4 = new Error("tunneling socket could not be established, statusCode=" + res.statusCode);
+          error4.code = "ECONNRESET";
+          options.request.emit("error", error4);
           self.removeSocket(placeholder);
           return;
         }
         if (head.length > 0) {
-          debug("got illegal response body from proxy");
+          debug5("got illegal response body from proxy");
           socket.destroy();
-          var error = new Error("got illegal response body from proxy");
-          error.code = "ECONNRESET";
-          options.request.emit("error", error);
+          var error4 = new Error("got illegal response body from proxy");
+          error4.code = "ECONNRESET";
+          options.request.emit("error", error4);
           self.removeSocket(placeholder);
           return;
         }
-        debug("tunneling connection has established");
+        debug5("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug(
+        debug5(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
         );
-        var error = new Error("tunneling socket could not be established, cause=" + cause.message);
-        error.code = "ECONNRESET";
-        options.request.emit("error", error);
+        var error4 = new Error("tunneling socket could not be established, cause=" + cause.message);
+        error4.code = "ECONNRESET";
+        options.request.emit("error", error4);
         self.removeSocket(placeholder);
       }
     };
@@ -500,9 +500,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug;
+    var debug5;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug = function() {
+      debug5 = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -512,10 +512,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug = function() {
+      debug5 = function() {
       };
     }
-    exports2.debug = debug;
+    exports2.debug = debug5;
   }
 });
 
@@ -5566,7 +5566,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r
         throw new TypeError("Body is unusable");
       }
       const promise = createDeferredPromise();
-      const errorSteps = (error) => promise.reject(error);
+      const errorSteps = (error4) => promise.reject(error4);
       const successSteps = (data) => {
         try {
           promise.resolve(convertBytesToJSValue(data));
@@ -5852,16 +5852,16 @@ var require_request = __commonJS({
           this.onError(err);
         }
       }
-      onError(error) {
+      onError(error4) {
         this.onFinally();
         if (channels.error.hasSubscribers) {
-          channels.error.publish({ request: this, error });
+          channels.error.publish({ request: this, error: error4 });
         }
         if (this.aborted) {
           return;
         }
         this.aborted = true;
-        return this[kHandler].onError(error);
+        return this[kHandler].onError(error4);
       }
       onFinally() {
         if (this.errorHandler) {
@@ -6724,8 +6724,8 @@ var require_RedirectHandler = __commonJS({
       onUpgrade(statusCode, headers, socket) {
         this.handler.onUpgrade(statusCode, headers, socket);
       }
-      onError(error) {
-        this.handler.onError(error);
+      onError(error4) {
+        this.handler.onError(error4);
       }
       onHeaders(statusCode, headers, resume, statusText) {
         this.location = this.history.length >= this.maxRedirections || util.isDisturbed(this.opts.body) ? null : parseLocation(statusCode, headers);
@@ -10467,13 +10467,13 @@ var require_mock_utils = __commonJS({
       if (mockDispatch2.data.callback) {
         mockDispatch2.data = { ...mockDispatch2.data, ...mockDispatch2.data.callback(opts) };
       }
-      const { data: { statusCode, data, headers, trailers, error }, delay, persist } = mockDispatch2;
+      const { data: { statusCode, data, headers, trailers, error: error4 }, delay, persist } = mockDispatch2;
       const { timesInvoked, times } = mockDispatch2;
       mockDispatch2.consumed = !persist && timesInvoked >= times;
       mockDispatch2.pending = timesInvoked < times;
-      if (error !== null) {
+      if (error4 !== null) {
         deleteMockDispatch(this[kDispatches], key);
-        handler.onError(error);
+        handler.onError(error4);
         return true;
       }
       if (typeof delay === "number" && delay > 0) {
@@ -10511,19 +10511,19 @@ var require_mock_utils = __commonJS({
         if (agent.isMockActive) {
           try {
             mockDispatch.call(this, opts, handler);
-          } catch (error) {
-            if (error instanceof MockNotMatchedError) {
+          } catch (error4) {
+            if (error4 instanceof MockNotMatchedError) {
               const netConnect = agent[kGetNetConnect]();
               if (netConnect === false) {
-                throw new MockNotMatchedError(`${error.message}: subsequent request to origin ${origin} was not allowed (net.connect disabled)`);
+                throw new MockNotMatchedError(`${error4.message}: subsequent request to origin ${origin} was not allowed (net.connect disabled)`);
               }
               if (checkNetConnect(netConnect, origin)) {
                 originalDispatch.call(this, opts, handler);
               } else {
-                throw new MockNotMatchedError(`${error.message}: subsequent request to origin ${origin} was not allowed (net.connect is not enabled for this origin)`);
+                throw new MockNotMatchedError(`${error4.message}: subsequent request to origin ${origin} was not allowed (net.connect is not enabled for this origin)`);
               }
             } else {
-              throw error;
+              throw error4;
             }
           }
         } else {
@@ -10686,11 +10686,11 @@ var require_mock_interceptor = __commonJS({
       /**
        * Mock an undici request with a defined error.
        */
-      replyWithError(error) {
-        if (typeof error === "undefined") {
+      replyWithError(error4) {
+        if (typeof error4 === "undefined") {
           throw new InvalidArgumentError("error must be defined");
         }
-        const newMockDispatch = addMockDispatch(this[kDispatches], this[kDispatchKey], { error });
+        const newMockDispatch = addMockDispatch(this[kDispatches], this[kDispatchKey], { error: error4 });
         return new MockScope(newMockDispatch);
       }
       /**
@@ -13013,17 +13013,17 @@ var require_fetch = __commonJS({
         this.emit("terminated", reason);
       }
       // https://fetch.spec.whatwg.org/#fetch-controller-abort
-      abort(error) {
+      abort(error4) {
         if (this.state !== "ongoing") {
           return;
         }
         this.state = "aborted";
-        if (!error) {
-          error = new DOMException2("The operation was aborted.", "AbortError");
+        if (!error4) {
+          error4 = new DOMException2("The operation was aborted.", "AbortError");
         }
-        this.serializedAbortReason = error;
-        this.connection?.destroy(error);
-        this.emit("terminated", error);
+        this.serializedAbortReason = error4;
+        this.connection?.destroy(error4);
+        this.emit("terminated", error4);
       }
     };
     function fetch2(input, init = {}) {
@@ -13127,13 +13127,13 @@ var require_fetch = __commonJS({
         performance.markResourceTiming(timingInfo, originalURL.href, initiatorType, globalThis2, cacheState);
       }
     }
-    function abortFetch(p, request, responseObject, error) {
-      if (!error) {
-        error = new DOMException2("The operation was aborted.", "AbortError");
+    function abortFetch(p, request, responseObject, error4) {
+      if (!error4) {
+        error4 = new DOMException2("The operation was aborted.", "AbortError");
       }
-      p.reject(error);
+      p.reject(error4);
       if (request.body != null && isReadable(request.body?.stream)) {
-        request.body.stream.cancel(error).catch((err) => {
+        request.body.stream.cancel(error4).catch((err) => {
           if (err.code === "ERR_INVALID_STATE") {
             return;
           }
@@ -13145,7 +13145,7 @@ var require_fetch = __commonJS({
       }
       const response = responseObject[kState];
       if (response.body != null && isReadable(response.body?.stream)) {
-        response.body.stream.cancel(error).catch((err) => {
+        response.body.stream.cancel(error4).catch((err) => {
           if (err.code === "ERR_INVALID_STATE") {
             return;
           }
@@ -13925,13 +13925,13 @@ var require_fetch = __commonJS({
               fetchParams.controller.ended = true;
               this.body.push(null);
             },
-            onError(error) {
+            onError(error4) {
               if (this.abort) {
                 fetchParams.controller.off("terminated", this.abort);
               }
-              this.body?.destroy(error);
-              fetchParams.controller.terminate(error);
-              reject(error);
+              this.body?.destroy(error4);
+              fetchParams.controller.terminate(error4);
+              reject(error4);
             },
             onUpgrade(status, headersList, socket) {
               if (status !== 101) {
@@ -14397,8 +14397,8 @@ var require_util4 = __commonJS({
                   }
                   fr[kResult] = result;
                   fireAProgressEvent("load", fr);
-                } catch (error) {
-                  fr[kError] = error;
+                } catch (error4) {
+                  fr[kError] = error4;
                   fireAProgressEvent("error", fr);
                 }
                 if (fr[kState] !== "loading") {
@@ -14407,13 +14407,13 @@ var require_util4 = __commonJS({
               });
               break;
             }
-          } catch (error) {
+          } catch (error4) {
             if (fr[kAborted]) {
               return;
             }
             queueMicrotask(() => {
               fr[kState] = "done";
-              fr[kError] = error;
+              fr[kError] = error4;
               fireAProgressEvent("error", fr);
               if (fr[kState] !== "loading") {
                 fireAProgressEvent("loadend", fr);
@@ -16427,11 +16427,11 @@ var require_connection = __commonJS({
         });
       }
     }
-    function onSocketError(error) {
+    function onSocketError(error4) {
       const { ws } = this;
       ws[kReadyState] = states.CLOSING;
       if (channels.socketError.hasSubscribers) {
-        channels.socketError.publish(error);
+        channels.socketError.publish(error4);
       }
       this.destroy();
     }
@@ -17575,12 +17575,12 @@ var require_lib = __commonJS({
             throw new Error("Client has already been disposed.");
           }
           const parsedUrl = new URL(requestUrl);
-          let info = this._prepareRequest(verb, parsedUrl, headers);
+          let info5 = this._prepareRequest(verb, parsedUrl, headers);
           const maxTries = this._allowRetries && RetryableHttpVerbs.includes(verb) ? this._maxRetries + 1 : 1;
           let numTries = 0;
           let response;
           do {
-            response = yield this.requestRaw(info, data);
+            response = yield this.requestRaw(info5, data);
             if (response && response.message && response.message.statusCode === HttpCodes.Unauthorized) {
               let authenticationHandler;
               for (const handler of this.handlers) {
@@ -17590,7 +17590,7 @@ var require_lib = __commonJS({
                 }
               }
               if (authenticationHandler) {
-                return authenticationHandler.handleAuthentication(this, info, data);
+                return authenticationHandler.handleAuthentication(this, info5, data);
               } else {
                 return response;
               }
@@ -17613,8 +17613,8 @@ var require_lib = __commonJS({
                   }
                 }
               }
-              info = this._prepareRequest(verb, parsedRedirectUrl, headers);
-              response = yield this.requestRaw(info, data);
+              info5 = this._prepareRequest(verb, parsedRedirectUrl, headers);
+              response = yield this.requestRaw(info5, data);
               redirectsRemaining--;
             }
             if (!response.message.statusCode || !HttpResponseRetryCodes.includes(response.message.statusCode)) {
@@ -17643,7 +17643,7 @@ var require_lib = __commonJS({
        * @param info
        * @param data
        */
-      requestRaw(info, data) {
+      requestRaw(info5, data) {
         return __awaiter(this, void 0, void 0, function* () {
           return new Promise((resolve, reject) => {
             function callbackForResult(err, res) {
@@ -17655,7 +17655,7 @@ var require_lib = __commonJS({
                 resolve(res);
               }
             }
-            this.requestRawWithCallback(info, data, callbackForResult);
+            this.requestRawWithCallback(info5, data, callbackForResult);
           });
         });
       }
@@ -17665,12 +17665,12 @@ var require_lib = __commonJS({
        * @param data
        * @param onResult
        */
-      requestRawWithCallback(info, data, onResult) {
+      requestRawWithCallback(info5, data, onResult) {
         if (typeof data === "string") {
-          if (!info.options.headers) {
-            info.options.headers = {};
+          if (!info5.options.headers) {
+            info5.options.headers = {};
           }
-          info.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
+          info5.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
         }
         let callbackCalled = false;
         function handleResult(err, res) {
@@ -17679,7 +17679,7 @@ var require_lib = __commonJS({
             onResult(err, res);
           }
         }
-        const req = info.httpModule.request(info.options, (msg) => {
+        const req = info5.httpModule.request(info5.options, (msg) => {
           const res = new HttpClientResponse(msg);
           handleResult(void 0, res);
         });
@@ -17691,7 +17691,7 @@ var require_lib = __commonJS({
           if (socket) {
             socket.end();
           }
-          handleResult(new Error(`Request timeout: ${info.options.path}`));
+          handleResult(new Error(`Request timeout: ${info5.options.path}`));
         });
         req.on("error", function(err) {
           handleResult(err);
@@ -17727,27 +17727,27 @@ var require_lib = __commonJS({
         return this._getProxyAgentDispatcher(parsedUrl, proxyUrl);
       }
       _prepareRequest(method, requestUrl, headers) {
-        const info = {};
-        info.parsedUrl = requestUrl;
-        const usingSsl = info.parsedUrl.protocol === "https:";
-        info.httpModule = usingSsl ? https : http;
+        const info5 = {};
+        info5.parsedUrl = requestUrl;
+        const usingSsl = info5.parsedUrl.protocol === "https:";
+        info5.httpModule = usingSsl ? https : http;
         const defaultPort = usingSsl ? 443 : 80;
-        info.options = {};
-        info.options.host = info.parsedUrl.hostname;
-        info.options.port = info.parsedUrl.port ? parseInt(info.parsedUrl.port) : defaultPort;
-        info.options.path = (info.parsedUrl.pathname || "") + (info.parsedUrl.search || "");
-        info.options.method = method;
-        info.options.headers = this._mergeHeaders(headers);
+        info5.options = {};
+        info5.options.host = info5.parsedUrl.hostname;
+        info5.options.port = info5.parsedUrl.port ? parseInt(info5.parsedUrl.port) : defaultPort;
+        info5.options.path = (info5.parsedUrl.pathname || "") + (info5.parsedUrl.search || "");
+        info5.options.method = method;
+        info5.options.headers = this._mergeHeaders(headers);
         if (this.userAgent != null) {
-          info.options.headers["user-agent"] = this.userAgent;
+          info5.options.headers["user-agent"] = this.userAgent;
         }
-        info.options.agent = this._getAgent(info.parsedUrl);
+        info5.options.agent = this._getAgent(info5.parsedUrl);
         if (this.handlers) {
           for (const handler of this.handlers) {
-            handler.prepareRequest(info.options);
+            handler.prepareRequest(info5.options);
           }
         }
-        return info;
+        return info5;
       }
       _mergeHeaders(headers) {
         if (this.requestOptions && this.requestOptions.headers) {
@@ -18063,12 +18063,12 @@ var require_oidc_utils = __commonJS({
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
           const httpclient = _OidcClient.createHttpClient();
-          const res = yield httpclient.getJson(id_token_url).catch((error) => {
+          const res = yield httpclient.getJson(id_token_url).catch((error4) => {
             throw new Error(`Failed to get ID Token. 
  
-        Error Code : ${error.statusCode}
+        Error Code : ${error4.statusCode}
  
-        Error Message: ${error.message}`);
+        Error Message: ${error4.message}`);
           });
           const id_token = (_a = res.result) === null || _a === void 0 ? void 0 : _a.value;
           if (!id_token) {
@@ -18089,8 +18089,8 @@ var require_oidc_utils = __commonJS({
             const id_token = yield _OidcClient.getCall(id_token_url);
             (0, core_1.setSecret)(id_token);
             return id_token;
-          } catch (error) {
-            throw new Error(`Error message: ${error.message}`);
+          } catch (error4) {
+            throw new Error(`Error message: ${error4.message}`);
           }
         });
       }
@@ -19212,7 +19212,7 @@ var require_toolrunner = __commonJS({
               this._debug(`STDIO streams have closed for tool '${this.toolPath}'`);
               state.CheckComplete();
             });
-            state.on("done", (error, exitCode) => {
+            state.on("done", (error4, exitCode) => {
               if (stdbuffer.length > 0) {
                 this.emit("stdline", stdbuffer);
               }
@@ -19220,8 +19220,8 @@ var require_toolrunner = __commonJS({
                 this.emit("errline", errbuffer);
               }
               cp.removeAllListeners();
-              if (error) {
-                reject(error);
+              if (error4) {
+                reject(error4);
               } else {
                 resolve(exitCode);
               }
@@ -19316,14 +19316,14 @@ var require_toolrunner = __commonJS({
         this.emit("debug", message);
       }
       _setResult() {
-        let error;
+        let error4;
         if (this.processExited) {
           if (this.processError) {
-            error = new Error(`There was an error when attempting to execute the process '${this.toolPath}'. This may indicate the process failed to start. Error: ${this.processError}`);
+            error4 = new Error(`There was an error when attempting to execute the process '${this.toolPath}'. This may indicate the process failed to start. Error: ${this.processError}`);
           } else if (this.processExitCode !== 0 && !this.options.ignoreReturnCode) {
-            error = new Error(`The process '${this.toolPath}' failed with exit code ${this.processExitCode}`);
+            error4 = new Error(`The process '${this.toolPath}' failed with exit code ${this.processExitCode}`);
           } else if (this.processStderr && this.options.failOnStdErr) {
-            error = new Error(`The process '${this.toolPath}' failed because one or more lines were written to the STDERR stream`);
+            error4 = new Error(`The process '${this.toolPath}' failed because one or more lines were written to the STDERR stream`);
           }
         }
         if (this.timeout) {
@@ -19331,7 +19331,7 @@ var require_toolrunner = __commonJS({
           this.timeout = null;
         }
         this.done = true;
-        this.emit("done", error, this.processExitCode);
+        this.emit("done", error4, this.processExitCode);
       }
       static HandleTimeout(state) {
         if (state.done) {
@@ -19712,51 +19712,51 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issue)("echo", enabled ? "on" : "off");
     }
     exports2.setCommandEcho = setCommandEcho;
-    function setFailed2(message) {
+    function setFailed3(message) {
       process.exitCode = ExitCode.Failure;
-      error(message);
+      error4(message);
     }
-    exports2.setFailed = setFailed2;
+    exports2.setFailed = setFailed3;
     function isDebug() {
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug(message) {
+    function debug5(message) {
       (0, command_1.issueCommand)("debug", {}, message);
     }
-    exports2.debug = debug;
-    function error(message, properties = {}) {
+    exports2.debug = debug5;
+    function error4(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.error = error;
-    function warning(message, properties = {}) {
+    exports2.error = error4;
+    function warning2(message, properties = {}) {
       (0, command_1.issueCommand)("warning", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.warning = warning;
+    exports2.warning = warning2;
     function notice(message, properties = {}) {
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.notice = notice;
-    function info(message) {
+    function info5(message) {
       process.stdout.write(message + os.EOL);
     }
-    exports2.info = info;
-    function startGroup(name) {
+    exports2.info = info5;
+    function startGroup4(name) {
       (0, command_1.issue)("group", name);
     }
-    exports2.startGroup = startGroup;
-    function endGroup() {
+    exports2.startGroup = startGroup4;
+    function endGroup4() {
       (0, command_1.issue)("endgroup");
     }
-    exports2.endGroup = endGroup;
+    exports2.endGroup = endGroup4;
     function group(name, fn) {
       return __awaiter(this, void 0, void 0, function* () {
-        startGroup(name);
+        startGroup4(name);
         let result;
         try {
           result = yield fn();
         } finally {
-          endGroup();
+          endGroup4();
         }
         return result;
       });
@@ -20029,8 +20029,8 @@ var require_add = __commonJS({
       }
       if (kind === "error") {
         hook = function(method, options) {
-          return Promise.resolve().then(method.bind(null, options)).catch(function(error) {
-            return orig(error, options);
+          return Promise.resolve().then(method.bind(null, options)).catch(function(error4) {
+            return orig(error4, options);
           });
         };
       }
@@ -20762,7 +20762,7 @@ var require_dist_node5 = __commonJS({
         }
         if (status >= 400) {
           const data = await getResponseData(response);
-          const error = new import_request_error.RequestError(toErrorMessage(data), status, {
+          const error4 = new import_request_error.RequestError(toErrorMessage(data), status, {
             response: {
               url,
               status,
@@ -20771,7 +20771,7 @@ var require_dist_node5 = __commonJS({
             },
             request: requestOptions
           });
-          throw error;
+          throw error4;
         }
         return parseSuccessResponseBody ? await getResponseData(response) : response.body;
       }).then((data) => {
@@ -20781,17 +20781,17 @@ var require_dist_node5 = __commonJS({
           headers,
           data
         };
-      }).catch((error) => {
-        if (error instanceof import_request_error.RequestError)
-          throw error;
-        else if (error.name === "AbortError")
-          throw error;
-        let message = error.message;
-        if (error.name === "TypeError" && "cause" in error) {
-          if (error.cause instanceof Error) {
-            message = error.cause.message;
-          } else if (typeof error.cause === "string") {
-            message = error.cause;
+      }).catch((error4) => {
+        if (error4 instanceof import_request_error.RequestError)
+          throw error4;
+        else if (error4.name === "AbortError")
+          throw error4;
+        let message = error4.message;
+        if (error4.name === "TypeError" && "cause" in error4) {
+          if (error4.cause instanceof Error) {
+            message = error4.cause.message;
+          } else if (typeof error4.cause === "string") {
+            message = error4.cause;
           }
         }
         throw new import_request_error.RequestError(message, 500, {
@@ -23457,9 +23457,9 @@ var require_dist_node10 = __commonJS({
                 /<([^>]+)>;\s*rel="next"/
               ) || [])[1];
               return { value: normalizedResponse };
-            } catch (error) {
-              if (error.status !== 409)
-                throw error;
+            } catch (error4) {
+              if (error4.status !== 409)
+                throw error4;
               url = "";
               return {
                 value: {
@@ -23865,8 +23865,15 @@ var require_github = __commonJS({
 });
 
 // src/pull-request-updater.ts
+var core5 = __toESM(require_core());
 var import_core = __toESM(require_core());
 var import_github = __toESM(require_github());
+
+// src/ai/ai-helper-resolver.ts
+var core3 = __toESM(require_core());
+
+// src/ai/gemini-ai-helper.ts
+var core = __toESM(require_core());
 
 // node_modules/@google/generative-ai/dist/index.mjs
 var SchemaType;
@@ -24842,7 +24849,10 @@ var GeminiAIHelper = class {
     try {
       const modelName = this.model?.trim() || "gemini-1.5-pro";
       const promptPreview = prompt.slice(0, 400).replace(/\n/g, "\\n");
-      console.log("[AI][Gemini] request ->", { model: modelName, temperature: this.temperature, promptLength: prompt.length, promptPreview });
+      core.startGroup("[AI][Gemini] Request");
+      core.info(`model=${modelName} temperature=${this.temperature}`);
+      core.debug(`promptLength=${prompt.length} preview=${promptPreview}`);
+      core.endGroup();
       const genAI = new GoogleGenerativeAI(this.apiKey);
       const model = genAI.getGenerativeModel({
         model: modelName,
@@ -24863,9 +24873,12 @@ var GeminiAIHelper = class {
       let text = response.text();
       const usage = response.usageMetadata || result.usageMetadata || void 0;
       const finishReason = response.candidates?.[0]?.finishReason || result.candidates?.[0]?.finishReason;
-      console.log("[AI][Gemini] response ->", { finishReason, usage, descriptionLength: text.length, descriptionPreview: text.slice(0, 200).replace(/\n/g, "\\n") });
+      core.startGroup("[AI][Gemini] Response");
+      core.info(`finishReason=${finishReason}`);
+      core.debug(`usage=${JSON.stringify(usage)} descLength=${text.length} preview=${text.slice(0, 200).replace(/\n/g, "\\n")}`);
+      core.endGroup();
       if (finishReason === "MAX_TOKENS") {
-        console.log("[AI][Gemini] continuation: finishReason=MAX_TOKENS, requesting more...");
+        core.info("[AI][Gemini] continuation: finishReason=MAX_TOKENS, requesting more...");
         const cont = await model.generateContent({
           contents: [
             { role: "user", parts: [{ text: prompt }] },
@@ -24877,19 +24890,23 @@ var GeminiAIHelper = class {
         const contResp = cont.response;
         const more = contResp.text();
         const fr2 = contResp.candidates?.[0]?.finishReason;
-        console.log("[AI][Gemini] continuation response ->", { finishReason: fr2, moreLength: more.length, morePreview: more.slice(0, 200).replace(/\n/g, "\\n") });
+        core.startGroup("[AI][Gemini] Continuation Response");
+        core.info(`finishReason=${fr2}`);
+        core.debug(`moreLength=${more.length} morePreview=${more.slice(0, 200).replace(/\n/g, "\\n")}`);
+        core.endGroup();
         text = (text + "\n\n" + more).trim();
       }
       return text;
-    } catch (error) {
-      console.error("[AI][Gemini] exception", { message: error.message });
-      throw new Error(`Gemini API Error: ${error.message}`);
+    } catch (error4) {
+      core.error(`[AI][Gemini] exception message=${error4.message}`);
+      throw new Error(`Gemini API Error: ${error4.message}`);
     }
   }
 };
 var gemini_ai_helper_default = GeminiAIHelper;
 
 // src/ai/open-ai-helper.ts
+var core2 = __toESM(require_core());
 var OpenAIHelper = class {
   apiKey;
   temperature;
@@ -24901,7 +24918,10 @@ var OpenAIHelper = class {
     try {
       const modelName = this.model?.trim() || "gpt-4.1";
       const promptPreview = prompt.slice(0, 400).replace(/\n/g, "\\n");
-      console.log("[AI][OpenAI] request ->", { model: modelName, temperature: this.temperature, promptLength: prompt.length, promptPreview });
+      core2.startGroup("[AI][OpenAI] Request");
+      core2.info(`model=${modelName} temperature=${this.temperature}`);
+      core2.debug(`promptLength=${prompt.length} preview=${promptPreview}`);
+      core2.endGroup();
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -24926,26 +24946,29 @@ var OpenAIHelper = class {
       });
       const raw = await response.text();
       if (!response.ok) {
-        console.error("[AI][OpenAI] http_error", { status: response.status, bodyPreview: raw.slice(0, 400) });
+        core2.error(`[AI][OpenAI] http_error status=${response.status} preview=${raw.slice(0, 400)}`);
         throw new Error(`OpenAI API HTTP ${response.status}: ${raw.slice(0, 200)}`);
       }
       let data;
       try {
         data = JSON.parse(raw);
       } catch (e) {
-        console.error("[AI][OpenAI] parse_error", { rawPreview: raw.slice(0, 400) });
+        core2.error(`[AI][OpenAI] parse_error preview=${raw.slice(0, 400)}`);
         throw e;
       }
       if (data.error) {
-        console.error("[AI][OpenAI] api_error", { error: data.error });
+        core2.error(`[AI][OpenAI] api_error code=${data.error.code || ""} message=${data.error.message || ""}`);
         throw new Error(`OpenAI API Error: ${data.error.message}`);
       }
       let description = (data.choices?.[0]?.message?.content || "").trim();
       const finishReason = data.choices?.[0]?.finish_reason || data.choices?.[0]?.finishReason;
       const usage = data.usage || {};
-      console.log("[AI][OpenAI] response ->", { finishReason, usage, descriptionLength: description.length, descriptionPreview: description.slice(0, 200).replace(/\n/g, "\\n") });
+      core2.startGroup("[AI][OpenAI] Response");
+      core2.info(`finishReason=${finishReason}`);
+      core2.debug(`usage=${JSON.stringify(usage)} descLength=${description.length} preview=${description.slice(0, 200).replace(/\n/g, "\\n")}`);
+      core2.endGroup();
       if (finishReason === "length") {
-        console.log("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
+        core2.info("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
         const contResp = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -24974,16 +24997,19 @@ var OpenAIHelper = class {
           }
           const more = (contData.choices?.[0]?.message?.content || "").trim();
           const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
-          console.log("[AI][OpenAI] continuation response ->", { finishReason: fr2, moreLength: more.length, morePreview: more.slice(0, 200).replace(/\n/g, "\\n") });
+          core2.startGroup("[AI][OpenAI] Continuation Response");
+          core2.info(`finishReason=${fr2}`);
+          core2.debug(`moreLength=${more.length} morePreview=${more.slice(0, 200).replace(/\n/g, "\\n")}`);
+          core2.endGroup();
           description = (description + "\n\n" + more).trim();
         } else {
-          console.warn("[AI][OpenAI] continuation failed", { status: contResp.status, bodyPreview: contRaw.slice(0, 200) });
+          core2.warning(`[AI][OpenAI] continuation failed status=${contResp.status} preview=${contRaw.slice(0, 200)}`);
         }
       }
       return description;
-    } catch (error) {
-      console.error("[AI][OpenAI] exception", { message: error.message });
-      throw new Error(`OpenAI API Error: ${error.message}`);
+    } catch (error4) {
+      core2.error(`[AI][OpenAI] exception message=${error4.message}`);
+      throw new Error(`OpenAI API Error: ${error4.message}`);
     }
   }
 };
@@ -24992,7 +25018,7 @@ var open_ai_helper_default = OpenAIHelper;
 // src/ai/ai-helper-resolver.ts
 var aiHelperResolver = (aiHelperParams) => {
   const { aiName, model, temperature } = aiHelperParams;
-  console.log("[AI] Resolver ->", { aiName, model, temperature });
+  core3.info(`[AI] Resolver -> provider=${aiName}, model=${model}, temperature=${temperature}`);
   switch (aiName) {
     case "open-ai":
     case "openai":
@@ -25005,6 +25031,7 @@ var aiHelperResolver = (aiHelperParams) => {
 var ai_helper_resolver_default = aiHelperResolver;
 
 // src/git-helper.ts
+var core4 = __toESM(require_core());
 var import_child_process = require("child_process");
 var GitHelper = class {
   ignores;
@@ -25024,9 +25051,9 @@ var GitHelper = class {
       ":!**/dist/*"
     ];
     const ignoreFiles = this.ignores ? this.ignores.split(",").map((item) => `:!${item.trim()}`) : defaultIgnoreFiles;
-    console.log("Ignore files:", JSON.stringify(ignoreFiles));
+    core4.debug(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
     const diffOutput = (0, import_child_process.execSync)(`git diff origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(" ")}`, { encoding: "utf8" });
-    console.log("Filtered diff output:", diffOutput);
+    core4.debug(`Filtered diff length: ${diffOutput.length}`);
     return diffOutput;
   }
 };
@@ -25045,7 +25072,7 @@ var PullRequestUpdater = class {
     const apiKey = (0, import_core.getInput)("api_key", { required: true }).trim();
     const temperature = Number.parseFloat((0, import_core.getInput)("temperature") || "0.8");
     this.aiHelper = ai_helper_resolver_default({ apiKey, aiName, temperature, model });
-    console.log("[Desc] AI configured", { aiName, model, temperature });
+    core5.info(`[Desc] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
     const githubToken = (0, import_core.getInput)("github_token", { required: true }).trim();
     this.octokit = (0, import_github.getOctokit)(githubToken);
   }
@@ -25082,22 +25109,27 @@ var PullRequestUpdater = class {
       const { baseBranch, headBranch } = this.extractBranchRefs();
       this.gitHelper.setupGitConfiguration();
       await this.gitHelper.fetchGitBranches(baseBranch, headBranch);
+      core5.startGroup("Diff and Prompt");
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
-      console.log("[Desc] diff stats", { length: diffOutput.length });
+      core5.debug(`[Desc] diff length=${diffOutput.length}`);
       const prompt = this.generatePrompt(diffOutput, creator);
-      console.log("[Desc] prompt prepared", { length: prompt.length, preview: this.previewStr(prompt) });
-      console.log("[Desc] calling AI to generate description...");
+      core5.debug(`[Desc] prompt length=${prompt.length}`);
+      core5.endGroup();
+      core5.startGroup("AI Generation");
+      core5.info("[Desc] calling AI to generate description");
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
-      console.log("[Desc] AI response (description)", { length: generatedDescription.length, preview: this.previewStr(generatedDescription, 300) });
-      console.log("[Desc] updating pull request with new description", { pr: pullRequestNumber, descriptionLength: generatedDescription.length });
+      core5.debug(`[Desc] AI description length=${generatedDescription.length}`);
+      core5.endGroup();
+      core5.startGroup("PR Update");
+      core5.info(`[Desc] updating pull request #${pullRequestNumber}`);
       await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
+      core5.endGroup();
       (0, import_core.setOutput)("pr_number", pullRequestNumber.toString());
       (0, import_core.setOutput)("description", generatedDescription);
-      console.log(`Successfully updated PR #${pullRequestNumber} description.`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      (0, import_core.setFailed)(errorMessage);
-      console.error(`Error updating PR: ${errorMessage}`);
+      core5.info(`Successfully updated PR #${pullRequestNumber} description.`);
+    } catch (error4) {
+      const errorMessage = error4 instanceof Error ? error4.message : "Unknown error";
+      core5.setFailed(errorMessage);
     }
   }
   validateEventContext() {
@@ -25109,8 +25141,8 @@ var PullRequestUpdater = class {
   extractBranchRefs() {
     const baseBranch = this.context.payload.pull_request.base.ref;
     const headBranch = this.context.payload.pull_request.head.ref;
-    console.log(`Base branch: ${baseBranch}`);
-    console.log(`Head branch: ${headBranch}`);
+    core5.info(`Base branch: ${baseBranch}`);
+    core5.info(`Head branch: ${headBranch}`);
     return { baseBranch, headBranch };
   }
   async updatePullRequestDescription(pullRequestNumber, generatedDescription) {
@@ -25123,14 +25155,11 @@ var PullRequestUpdater = class {
           currentDescription
         );
       }
-      console.log("[Desc] will apply new description", { prevLength: currentDescription.length, newLength: generatedDescription.length, newPreview: this.previewStr(generatedDescription, 200) });
+      core5.debug(`[Desc] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
       await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
-    } catch (error) {
-      console.error(
-        `Error updating PR #${pullRequestNumber} description:`,
-        error
-      );
-      throw error;
+    } catch (error4) {
+      core5.error(`Error updating PR #${pullRequestNumber} description: ${error4.message}`);
+      throw error4;
     }
   }
   async fetchPullRequestDetails(pullRequestNumber) {
@@ -25145,7 +25174,7 @@ var PullRequestUpdater = class {
     return this.context.payload.pull_request.head.ref.replace("feat/", "").replace("fix/", "");
   }
   async postOriginalDescriptionComment(pullRequestNumber, currentDescription) {
-    console.log("Creating comment with original description...");
+    core5.info("Creating comment with original description...");
     await this.octokit.rest.issues.createComment({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
@@ -25154,17 +25183,17 @@ var PullRequestUpdater = class {
 
 ${currentDescription}`
     });
-    console.log("Comment created successfully.");
+    core5.info("Comment created successfully.");
   }
   async applyPullRequestUpdate(pullRequestNumber, newDescription) {
-    console.log("Updating PR description...");
+    core5.info("Updating PR description...");
     await this.octokit.rest.pulls.update({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       pull_number: pullRequestNumber,
       body: newDescription
     });
-    console.log("PR description updated successfully.");
+    core5.info("PR description updated successfully.");
   }
 };
 var pull_request_updater_default = PullRequestUpdater;

@@ -1,3 +1,4 @@
+import * as core from '@actions/core';
 import { AIHelperInterface, AIHelperParams } from './types';
 
 class OpenAIHelper implements AIHelperInterface {
@@ -13,7 +14,10 @@ class OpenAIHelper implements AIHelperInterface {
     try {
       const modelName = this.model?.trim() || 'gpt-4.1';
       const promptPreview = prompt.slice(0, 400).replace(/\n/g, '\\n');
-      console.log('[AI][OpenAI] request ->', { model: modelName, temperature: this.temperature, promptLength: prompt.length, promptPreview });
+        core.startGroup('[AI][OpenAI] Request');
+        core.info(`model=${modelName} temperature=${this.temperature}`);
+        core.debug(`promptLength=${prompt.length} preview=${promptPreview}`);
+        core.endGroup();
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -37,27 +41,30 @@ class OpenAIHelper implements AIHelperInterface {
           }),
         });
         const raw = await response.text();
-        if (!response.ok) {
-          console.error('[AI][OpenAI] http_error', { status: response.status, bodyPreview: raw.slice(0, 400) });
-          throw new Error(`OpenAI API HTTP ${response.status}: ${raw.slice(0, 200)}`);
-        }
+          if (!response.ok) {
+            core.error(`[AI][OpenAI] http_error status=${response.status} preview=${raw.slice(0, 400)}`);
+            throw new Error(`OpenAI API HTTP ${response.status}: ${raw.slice(0, 200)}`);
+          }
         let data: any;
-        try { data = JSON.parse(raw); } catch (e) {
-          console.error('[AI][OpenAI] parse_error', { rawPreview: raw.slice(0, 400) });
-          throw e;
-        }
-        if (data.error) {
-          console.error('[AI][OpenAI] api_error', { error: data.error });
-          throw new Error(`OpenAI API Error: ${data.error.message}`);
-        }
+          try { data = JSON.parse(raw); } catch (e) {
+            core.error(`[AI][OpenAI] parse_error preview=${raw.slice(0, 400)}`);
+            throw e;
+          }
+          if (data.error) {
+            core.error(`[AI][OpenAI] api_error code=${data.error.code || ''} message=${data.error.message || ''}`);
+            throw new Error(`OpenAI API Error: ${data.error.message}`);
+          }
         let description = (data.choices?.[0]?.message?.content || '').trim();
         const finishReason = data.choices?.[0]?.finish_reason || data.choices?.[0]?.finishReason;
         const usage = data.usage || {};
-        console.log('[AI][OpenAI] response ->', { finishReason, usage, descriptionLength: description.length, descriptionPreview: description.slice(0, 200).replace(/\n/g, '\\n') });
+          core.startGroup('[AI][OpenAI] Response');
+          core.info(`finishReason=${finishReason}`);
+          core.debug(`usage=${JSON.stringify(usage)} descLength=${description.length} preview=${description.slice(0, 200).replace(/\n/g, '\\n')}`);
+          core.endGroup();
 
         // If output was cut by token limit, try a single continuation
         if (finishReason === 'length') {
-          console.log('[AI][OpenAI] continuation: finish_reason=length, requesting more...');
+          core.info('[AI][OpenAI] continuation: finish_reason=length, requesting more...');
           const contResp = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -82,16 +89,19 @@ class OpenAIHelper implements AIHelperInterface {
             try { contData = JSON.parse(contRaw); } catch { contData = {}; }
             const more = (contData.choices?.[0]?.message?.content || '').trim();
             const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
-            console.log('[AI][OpenAI] continuation response ->', { finishReason: fr2, moreLength: more.length, morePreview: more.slice(0, 200).replace(/\n/g, '\\n') });
+            core.startGroup('[AI][OpenAI] Continuation Response');
+            core.info(`finishReason=${fr2}`);
+            core.debug(`moreLength=${more.length} morePreview=${more.slice(0, 200).replace(/\n/g, '\\n')}`);
+            core.endGroup();
             description = (description + '\n\n' + more).trim();
           } else {
-            console.warn('[AI][OpenAI] continuation failed', { status: contResp.status, bodyPreview: contRaw.slice(0, 200) });
+            core.warning(`[AI][OpenAI] continuation failed status=${contResp.status} preview=${contRaw.slice(0, 200)}`);
           }
         }
 
         return description;
     } catch (error) {
-      console.error('[AI][OpenAI] exception', { message: (error as Error).message });
+      core.error(`[AI][OpenAI] exception message=${(error as Error).message}`);
       throw new Error(`OpenAI API Error: ${(error as Error).message}`);
     }
   }
