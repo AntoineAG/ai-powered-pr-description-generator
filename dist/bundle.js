@@ -24894,16 +24894,28 @@ var GeminiAIHelper = class {
     try {
       const modelName = this.model?.trim() || "gemini-2.5-flash";
       const maxTokensEnv = Number.parseInt(process.env.MAX_OUTPUT_TOKENS || "", 10);
-      const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? maxTokensEnv : 2048;
+      const initialMaxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? Math.max(768, maxTokensEnv) : 1024;
       const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
       core.startGroup("[AI][Gemini] Request");
-      core.info(`model=${modelName} temperature=${this.temperature} maxOutputTokens=${maxOutputTokens}`);
+      core.info(`model=${modelName} temperature=${this.temperature} maxOutputTokens=${initialMaxOutputTokens}`);
       core.info(`promptLength=${prompt.length}`);
       core.info(`promptPreview:
 ${promptPreview}`);
       core.endGroup();
       const systemText = "You are very good at reviewing code and can generate pull request descriptions.";
       const genAI = new GoogleGenerativeAI(this.apiKey);
+      const modelCache = /* @__PURE__ */ new Map();
+      const getModel = (name) => {
+        let m = modelCache.get(name);
+        if (!m) {
+          m = genAI.getGenerativeModel({
+            model: name,
+            ...name.toLocaleLowerCase().startsWith("gemini-2") ? { systemInstruction: systemText } : {}
+          });
+          modelCache.set(name, m);
+        }
+        return m;
+      };
       const generateWithRetry = async (payload2, initialModel) => {
         const maxAttempts = 100;
         const baseDelayMs = 1e3;
@@ -24918,10 +24930,7 @@ ${promptPreview}`);
           const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs) + Math.floor(Math.random() * jitterMs);
           core.startGroup(`[AI][Gemini] Attempt ${attempt} model=${currentModel}`);
           try {
-            const localModel = genAI.getGenerativeModel({
-              model: currentModel,
-              ...currentModel.toLocaleLowerCase().startsWith("gemini-2") ? { systemInstruction: systemText } : {}
-            });
+            const localModel = getModel(currentModel);
             const res = await localModel.generateContent(payload2);
             core.info(`[AI][Gemini] success on attempt=${attempt} model=${currentModel}`);
             core.endGroup();
@@ -24962,12 +24971,28 @@ ${prompt}` : prompt }] }
         ],
         generationConfig: {
           temperature: this.temperature,
-          maxOutputTokens
+          maxOutputTokens: initialMaxOutputTokens
         }
       };
-      const { result } = await generateWithRetry(payload, modelName);
+      const { result, modelUsed } = await generateWithRetry(payload, modelName);
       const response = result.response;
-      let text = response.text();
+      const concatCandidatePartsText = (resp) => {
+        try {
+          const parts = resp?.candidates?.[0]?.content?.parts || [];
+          const buf = [];
+          for (const p of parts) {
+            if (typeof p?.text === "string") buf.push(p.text);
+          }
+          return buf.join("").trim();
+        } catch {
+          try {
+            return response.text()?.trim?.() || "";
+          } catch {
+            return "";
+          }
+        }
+      };
+      let text = concatCandidatePartsText(response);
       const usage = response.usageMetadata || result.usageMetadata || void 0;
       const finishReason = response.candidates?.[0]?.finishReason || result.candidates?.[0]?.finishReason;
       core.startGroup("[AI][Gemini] Response");
@@ -24976,27 +25001,76 @@ ${prompt}` : prompt }] }
       core.info(`description:
 ${text}`);
       core.endGroup();
+      const safeNum = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
+      const promptTokenCount = safeNum(usage?.promptTokenCount);
+      const candidatesTokenCount = safeNum(usage?.candidatesTokenCount);
+      let totalTokenCount = safeNum(usage?.totalTokenCount);
+      if (!totalTokenCount) totalTokenCount = promptTokenCount + candidatesTokenCount;
+      const approxVisibleTokens = Math.max(1, Math.ceil((text || "").length / 4));
+      const thoughtsTokenCount = Math.max(0, candidatesTokenCount - approxVisibleTokens);
+      const outputDen = Math.max(1, candidatesTokenCount);
+      const thoughtsRatioOutput = thoughtsTokenCount / outputDen;
+      const thoughtsRatioTotal = totalTokenCount > 0 ? thoughtsTokenCount / totalTokenCount : 0;
+      const visibleRatioOutput = Math.max(0, 1 - thoughtsRatioOutput);
+      core.startGroup("[AI][Gemini] Usage Diagnostics");
+      core.info(`promptTokenCount=${promptTokenCount}`);
+      core.info(`candidatesTokenCount=${candidatesTokenCount}`);
+      core.info(`thoughtsTokenCount=${thoughtsTokenCount}`);
+      core.info(`totalTokenCount=${totalTokenCount}`);
+      const percent = (v) => `${Math.round(v * 100)}%`;
+      const thoughtsPct = percent(thoughtsRatioOutput);
+      const visiblePct = percent(visibleRatioOutput);
+      core.warning(`\u26A0\uFE0F ${thoughtsPct} of output tokens spent on internal reasoning (thoughts)`);
+      core.info(`\u2705 ${visiblePct} used for visible content`);
+      if (thoughtsRatioTotal > 0.9) {
+        core.warning("[AI][Gemini] High thoughts/total token ratio (>90%). Consider increasing maxOutputTokens.");
+      } else if (thoughtsRatioOutput >= 0.2 && thoughtsRatioOutput <= 0.3) {
+        core.info("[AI][Gemini] Balanced usage: ~20\u201330% thoughts vs output tokens.");
+      }
+      core.endGroup();
       if (finishReason === "MAX_TOKENS") {
-        core.info("[AI][Gemini] continuation: finishReason=MAX_TOKENS, requesting more...");
-        const contPayload = {
-          contents: [
-            { role: "user", parts: [{ text: prompt }] },
-            { role: "model", parts: [{ text }] },
-            { role: "user", parts: [{ text: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }] }
-          ],
-          generationConfig: { temperature: this.temperature, maxOutputTokens }
-        };
-        const { result: cont } = await generateWithRetry(contPayload, modelName);
-        const contResp = cont.response;
-        const more = contResp.text();
-        const fr2 = contResp.candidates?.[0]?.finishReason;
-        core.startGroup("[AI][Gemini] Continuation Response");
-        core.info(`finishReason=${fr2}`);
-        core.info(`moreLength=${more.length}`);
-        core.info(`more:
+        if (!text || text.trim().length === 0) {
+          const bumped = Math.ceil(initialMaxOutputTokens * 1.5);
+          core.info(`[AI][Gemini] finishReason=MAX_TOKENS with empty output; retrying once with maxOutputTokens=${bumped}`);
+          const retryPayload = {
+            contents: [
+              { role: "user", parts: [{ text: !modelName.toLocaleLowerCase().startsWith("gemini-2") ? `${systemText}
+
+${prompt}` : prompt }] }
+            ],
+            generationConfig: { temperature: this.temperature, maxOutputTokens: bumped }
+          };
+          const res = await getModel(modelUsed).generateContent(retryPayload);
+          const retryResp = res.response;
+          const retryText = concatCandidatePartsText(retryResp);
+          const frRetry = retryResp.candidates?.[0]?.finishReason;
+          core.startGroup("[AI][Gemini] Retry (Increased maxOutputTokens)");
+          core.info(`finishReason=${frRetry}`);
+          core.info(`descLength=${retryText.length}`);
+          core.endGroup();
+          text = retryText;
+        } else {
+          core.info("[AI][Gemini] continuation: finishReason=MAX_TOKENS with non-empty output, requesting continuation...");
+          const contPayload = {
+            contents: [
+              { role: "user", parts: [{ text: prompt }] },
+              { role: "model", parts: [{ text }] },
+              { role: "user", parts: [{ text: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }] }
+            ],
+            generationConfig: { temperature: this.temperature, maxOutputTokens: initialMaxOutputTokens }
+          };
+          const cont = await getModel(modelUsed).generateContent(contPayload);
+          const contResp = cont.response;
+          const more = concatCandidatePartsText(contResp);
+          const fr2 = contResp.candidates?.[0]?.finishReason;
+          core.startGroup("[AI][Gemini] Continuation Response");
+          core.info(`finishReason=${fr2}`);
+          core.info(`moreLength=${more.length}`);
+          core.info(`more:
 ${more}`);
-        core.endGroup();
-        text = (text + "\n\n" + more).trim();
+          core.endGroup();
+          text = (text + more).trim();
+        }
       }
       return text;
     } catch (error4) {
