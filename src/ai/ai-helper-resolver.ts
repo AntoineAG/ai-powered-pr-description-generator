@@ -13,9 +13,9 @@ const aiHelperResolver = (aiHelperParams: AIHelperParams): AIHelperInterface => 
         case 'gemini':
         default: {
             const modelName = (model || 'gemini-2.5-flash').trim();
-            // Preserve existing behavior: default 1024, clamp env override to >= 768
+            // Default to 1536, clamp env override to >= 768
             const maxTokensEnv = Number.parseInt(process.env.MAX_OUTPUT_TOKENS || '', 10);
-            const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? Math.max(768, maxTokensEnv) : 1024;
+            const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? Math.max(768, maxTokensEnv) : 1536;
             const systemText = 'You are very good at reviewing code and can generate pull request descriptions.';
             const config: GeminiConfig = {
                 apiKey: aiHelperParams.apiKey,
@@ -28,7 +28,8 @@ const aiHelperResolver = (aiHelperParams: AIHelperParams): AIHelperInterface => 
                 info: (msg: string) => core.info(msg),
                 warn: (msg: string) => core.warning(msg),
                 error: (msg: string) => core.error(msg),
-                debug: (msg: string) => core.debug ? core.debug(msg) : core.info(msg),
+                // Route debug lines to info for better visibility in Actions
+                debug: (msg: string) => core.info(msg),
             };
             return new GeminiAIHelper({ config, logger });
         }

@@ -23,8 +23,8 @@ class GeminiAIHelper implements AIHelperInterface {
       const { model: modelName, temperature, maxOutputTokens: initialMaxOutputTokens, systemText } = this.config;
       const promptPreview = prompt.length > 2000 ? `${prompt.slice(0, 2000)}[...]` : prompt;
       this.logger.info(`[AI][Gemini] Request model=${modelName} temperature=${temperature} maxOutputTokens=${initialMaxOutputTokens}`);
-      this.logger.debug?.(`[AI][Gemini] promptLength=${prompt.length}`);
-      this.logger.debug?.(`[AI][Gemini] promptPreview=\n${promptPreview}`);
+      this.logger.info(`[AI][Gemini] promptLength=${prompt.length}`);
+      this.logger.info(`[AI][Gemini] promptPreview=\n${promptPreview}`);
 
       const payload: GenerateContentRequest = {
         contents: [
@@ -44,8 +44,8 @@ class GeminiAIHelper implements AIHelperInterface {
       const usage: UsageMetadata | undefined = response.usageMetadata || (result as any).usageMetadata || undefined;
       const finishReason: FinishReason | undefined = response.candidates?.[0]?.finishReason;
       this.logger.info(`[AI][Gemini] Response finishReason=${finishReason}`);
-      this.logger.debug?.(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      this.logger.debug?.(`[AI][Gemini] description=\n${text}`);
+      this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
+      this.logger.info(`[AI][Gemini] description=\n${text}`);
 
       this.logUsageDiagnostics(usage, text);
 
@@ -79,8 +79,8 @@ class GeminiAIHelper implements AIHelperInterface {
           const contResp: EnhancedGenerateContentResponse = cont.response;
           const more = this.concatCandidatePartsText(contResp);
           const fr2: FinishReason | undefined = contResp.candidates?.[0]?.finishReason;
-          this.logger.debug?.(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
-          this.logger.debug?.(`[AI][Gemini] more=\n${more}`);
+          this.logger.info(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
+          this.logger.info(`[AI][Gemini] more=\n${more}`);
           text = (text + '\n\n' + more).trim();
         }
       }
@@ -179,29 +179,44 @@ class GeminiAIHelper implements AIHelperInterface {
 
   private logUsageDiagnostics(usage: UsageMetadata | undefined, text: string): void {
     const safeNum = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? n : 0);
-    const promptTokenCount = safeNum(usage?.promptTokenCount);
-    const candidatesTokenCount = safeNum(usage?.candidatesTokenCount);
-    let totalTokenCount = safeNum(usage?.totalTokenCount);
-    if (!totalTokenCount) totalTokenCount = promptTokenCount + candidatesTokenCount;
+    const prompt = safeNum(usage?.promptTokenCount);
+    const candidates = safeNum(usage?.candidatesTokenCount);
+    let total = safeNum(usage?.totalTokenCount);
+    if (!total) total = prompt + candidates;
 
-    const approxVisibleTokens = Math.max(1, Math.ceil((text || '').length / 4));
-    const thoughtsTokenCount = Math.max(0, candidatesTokenCount - approxVisibleTokens);
-    const outputDen = Math.max(1, candidatesTokenCount);
-    const thoughtsRatioOutput = thoughtsTokenCount / outputDen;
-    const thoughtsRatioTotal = totalTokenCount > 0 ? (thoughtsTokenCount / totalTokenCount) : 0;
-    const visibleRatioOutput = Math.max(0, 1 - thoughtsRatioOutput);
+    const approxVisible = Math.max(1, Math.ceil((text || '').length / 4));
+
+    let inferredThoughts = 0;
+    let thoughts = 0;
+    if (candidates > 0) {
+      thoughts = Math.max(0, candidates - approxVisible);
+    } else if (total > prompt) {
+      inferredThoughts = total - prompt;
+      thoughts = inferredThoughts;
+      this.logger.warn(`⚠️ Output tokens not reported by API; inferring internal reasoning from total−prompt ≈ ${inferredThoughts}`);
+    } else {
+      thoughts = 0;
+    }
+
+    const den = Math.max(1, total || candidates || prompt);
+    const thoughtsRatioTotal = thoughts / den;
+    const visibleRatioTotal = Math.max(0, 1 - thoughtsRatioTotal);
 
     const percent = (v: number) => `${Math.round(v * 100)}%`;
-    const thoughtsPct = percent(thoughtsRatioOutput);
-    const visiblePct = percent(visibleRatioOutput);
+    const thoughtsPct = percent(thoughtsRatioTotal);
+    const visiblePct = percent(visibleRatioTotal);
 
-    this.logger.info(`[AI][Gemini] Usage Diagnostics prompt=${promptTokenCount} candidates=${candidatesTokenCount} thoughts=${thoughtsTokenCount} total=${totalTokenCount}`);
-    this.logger.warn(`⚠️ ${thoughtsPct} internal reasoning`);
-    this.logger.info(`✅ ${visiblePct} visible content`);
+    this.logger.info('[AI][Gemini] Usage Summary');
+    if (inferredThoughts > 0) {
+      this.logger.info(`prompt=${prompt}  total=${total}  inferredThoughts=${inferredThoughts}`);
+    } else {
+      this.logger.info(`prompt=${prompt}  total=${total}  thoughts=${thoughts}  candidates=${candidates}`);
+    }
+    this.logger.info(`⚠️ ${thoughtsPct} internal reasoning, ✅ ${visiblePct} visible output`);
     if (thoughtsRatioTotal > 0.9) {
       this.logger.warn('[AI][Gemini] High thoughts/total token ratio (>90%). Consider increasing maxOutputTokens.');
-    } else if (thoughtsRatioOutput >= 0.2 && thoughtsRatioOutput <= 0.3) {
-      this.logger.info('[AI][Gemini] Balanced usage: ~20–30% thoughts vs output tokens.');
+    } else if (thoughtsRatioTotal >= 0.2 && thoughtsRatioTotal <= 0.3) {
+      this.logger.info('✅ Balanced usage');
     }
   }
 }

@@ -392,7 +392,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug2("making CONNECT request");
+      debug("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -412,7 +412,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug2(
+          debug(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -424,7 +424,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug2("got illegal response body from proxy");
+          debug("got illegal response body from proxy");
           socket.destroy();
           var error4 = new Error("got illegal response body from proxy");
           error4.code = "ECONNRESET";
@@ -432,13 +432,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug2("tunneling connection has established");
+        debug("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug2(
+        debug(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -500,9 +500,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug2;
+    var debug;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug2 = function() {
+      debug = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -512,10 +512,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug2 = function() {
+      debug = function() {
       };
     }
-    exports2.debug = debug2;
+    exports2.debug = debug;
   }
 });
 
@@ -19721,10 +19721,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug2(message) {
+    function debug(message) {
       (0, command_1.issueCommand)("debug", {}, message);
     }
-    exports2.debug = debug2;
+    exports2.debug = debug;
     function error4(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -24894,8 +24894,8 @@ var GeminiAIHelper = class {
       const { model: modelName, temperature, maxOutputTokens: initialMaxOutputTokens, systemText } = this.config;
       const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
       this.logger.info(`[AI][Gemini] Request model=${modelName} temperature=${temperature} maxOutputTokens=${initialMaxOutputTokens}`);
-      this.logger.debug?.(`[AI][Gemini] promptLength=${prompt.length}`);
-      this.logger.debug?.(`[AI][Gemini] promptPreview=
+      this.logger.info(`[AI][Gemini] promptLength=${prompt.length}`);
+      this.logger.info(`[AI][Gemini] promptPreview=
 ${promptPreview}`);
       const payload = {
         contents: [
@@ -24915,8 +24915,8 @@ ${prompt}` : prompt }] }
       const usage = response.usageMetadata || result.usageMetadata || void 0;
       const finishReason = response.candidates?.[0]?.finishReason;
       this.logger.info(`[AI][Gemini] Response finishReason=${finishReason}`);
-      this.logger.debug?.(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      this.logger.debug?.(`[AI][Gemini] description=
+      this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
+      this.logger.info(`[AI][Gemini] description=
 ${text}`);
       this.logUsageDiagnostics(usage, text);
       if (finishReason === FinishReason.MAX_TOKENS) {
@@ -24951,8 +24951,8 @@ ${prompt}` : prompt }] }
           const contResp = cont.response;
           const more = this.concatCandidatePartsText(contResp);
           const fr2 = contResp.candidates?.[0]?.finishReason;
-          this.logger.debug?.(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
-          this.logger.debug?.(`[AI][Gemini] more=
+          this.logger.info(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
+          this.logger.info(`[AI][Gemini] more=
 ${more}`);
           text = (text + "\n\n" + more).trim();
         }
@@ -25044,26 +25044,39 @@ ${more}`);
   }
   logUsageDiagnostics(usage, text) {
     const safeNum = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
-    const promptTokenCount = safeNum(usage?.promptTokenCount);
-    const candidatesTokenCount = safeNum(usage?.candidatesTokenCount);
-    let totalTokenCount = safeNum(usage?.totalTokenCount);
-    if (!totalTokenCount) totalTokenCount = promptTokenCount + candidatesTokenCount;
-    const approxVisibleTokens = Math.max(1, Math.ceil((text || "").length / 4));
-    const thoughtsTokenCount = Math.max(0, candidatesTokenCount - approxVisibleTokens);
-    const outputDen = Math.max(1, candidatesTokenCount);
-    const thoughtsRatioOutput = thoughtsTokenCount / outputDen;
-    const thoughtsRatioTotal = totalTokenCount > 0 ? thoughtsTokenCount / totalTokenCount : 0;
-    const visibleRatioOutput = Math.max(0, 1 - thoughtsRatioOutput);
+    const prompt = safeNum(usage?.promptTokenCount);
+    const candidates = safeNum(usage?.candidatesTokenCount);
+    let total = safeNum(usage?.totalTokenCount);
+    if (!total) total = prompt + candidates;
+    const approxVisible = Math.max(1, Math.ceil((text || "").length / 4));
+    let inferredThoughts = 0;
+    let thoughts = 0;
+    if (candidates > 0) {
+      thoughts = Math.max(0, candidates - approxVisible);
+    } else if (total > prompt) {
+      inferredThoughts = total - prompt;
+      thoughts = inferredThoughts;
+      this.logger.warn(`\u26A0\uFE0F Output tokens not reported by API; inferring internal reasoning from total\u2212prompt \u2248 ${inferredThoughts}`);
+    } else {
+      thoughts = 0;
+    }
+    const den = Math.max(1, total || candidates || prompt);
+    const thoughtsRatioTotal = thoughts / den;
+    const visibleRatioTotal = Math.max(0, 1 - thoughtsRatioTotal);
     const percent = (v) => `${Math.round(v * 100)}%`;
-    const thoughtsPct = percent(thoughtsRatioOutput);
-    const visiblePct = percent(visibleRatioOutput);
-    this.logger.info(`[AI][Gemini] Usage Diagnostics prompt=${promptTokenCount} candidates=${candidatesTokenCount} thoughts=${thoughtsTokenCount} total=${totalTokenCount}`);
-    this.logger.warn(`\u26A0\uFE0F ${thoughtsPct} internal reasoning`);
-    this.logger.info(`\u2705 ${visiblePct} visible content`);
+    const thoughtsPct = percent(thoughtsRatioTotal);
+    const visiblePct = percent(visibleRatioTotal);
+    this.logger.info("[AI][Gemini] Usage Summary");
+    if (inferredThoughts > 0) {
+      this.logger.info(`prompt=${prompt}  total=${total}  inferredThoughts=${inferredThoughts}`);
+    } else {
+      this.logger.info(`prompt=${prompt}  total=${total}  thoughts=${thoughts}  candidates=${candidates}`);
+    }
+    this.logger.info(`\u26A0\uFE0F ${thoughtsPct} internal reasoning, \u2705 ${visiblePct} visible output`);
     if (thoughtsRatioTotal > 0.9) {
       this.logger.warn("[AI][Gemini] High thoughts/total token ratio (>90%). Consider increasing maxOutputTokens.");
-    } else if (thoughtsRatioOutput >= 0.2 && thoughtsRatioOutput <= 0.3) {
-      this.logger.info("[AI][Gemini] Balanced usage: ~20\u201330% thoughts vs output tokens.");
+    } else if (thoughtsRatioTotal >= 0.2 && thoughtsRatioTotal <= 0.3) {
+      this.logger.info("\u2705 Balanced usage");
     }
   }
 };
@@ -25191,7 +25204,7 @@ var aiHelperResolver = (aiHelperParams) => {
     default: {
       const modelName = (model || "gemini-2.5-flash").trim();
       const maxTokensEnv = Number.parseInt(process.env.MAX_OUTPUT_TOKENS || "", 10);
-      const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? Math.max(768, maxTokensEnv) : 1024;
+      const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? Math.max(768, maxTokensEnv) : 1536;
       const systemText = "You are very good at reviewing code and can generate pull request descriptions.";
       const config = {
         apiKey: aiHelperParams.apiKey,
@@ -25204,7 +25217,8 @@ var aiHelperResolver = (aiHelperParams) => {
         info: (msg) => core2.info(msg),
         warn: (msg) => core2.warning(msg),
         error: (msg) => core2.error(msg),
-        debug: (msg) => core2.debug ? core2.debug(msg) : core2.info(msg)
+        // Route debug lines to info for better visibility in Actions
+        debug: (msg) => core2.info(msg)
       };
       return new gemini_ai_helper_default({ config, logger });
     }
