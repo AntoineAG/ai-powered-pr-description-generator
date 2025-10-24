@@ -24893,10 +24893,12 @@ var GeminiAIHelper = class {
     try {
       const { model: modelName, temperature, maxOutputTokens: initialMaxOutputTokens, systemText } = this.config;
       const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
-      this.logger.info(`[AI][Gemini] Request model=${modelName} temperature=${temperature} maxOutputTokens=${initialMaxOutputTokens}`);
+      this.logger.info(`
+[AI][Gemini] Request model=${modelName} temperature=${temperature} maxOutputTokens=${initialMaxOutputTokens}`);
       this.logger.info(`[AI][Gemini] promptLength=${prompt.length}`);
-      this.logger.info(`[AI][Gemini] promptPreview=
-${promptPreview}`);
+      this.logger.info(`[AI][Gemini] promptPreview:
+${promptPreview}
+`);
       const payload = {
         contents: [
           { role: "user", parts: [{ text: !this.supportsSystemInstruction(modelName) ? `${systemText}
@@ -24914,10 +24916,12 @@ ${prompt}` : prompt }] }
       let text = textFromParts;
       const usage = response.usageMetadata || result.usageMetadata || void 0;
       const finishReason = response.candidates?.[0]?.finishReason;
-      this.logger.info(`[AI][Gemini] Response finishReason=${finishReason}`);
+      this.logger.info(`
+[AI][Gemini] Response finishReason=${finishReason}`);
       this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      this.logger.info(`[AI][Gemini] description=
-${text}`);
+      this.logger.info(`[AI][Gemini] description:
+${text}
+`);
       this.logUsageDiagnostics(usage, text);
       if (finishReason === FinishReason.MAX_TOKENS) {
         if (!text || text.trim().length === 0) {
@@ -24951,9 +24955,11 @@ ${prompt}` : prompt }] }
           const contResp = cont.response;
           const more = this.concatCandidatePartsText(contResp);
           const fr2 = contResp.candidates?.[0]?.finishReason;
-          this.logger.info(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
-          this.logger.info(`[AI][Gemini] more=
-${more}`);
+          this.logger.info(`
+[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
+          this.logger.info(`[AI][Gemini] more:
+${more}
+`);
           text = (text + "\n\n" + more).trim();
         }
       }
@@ -25068,12 +25074,13 @@ ${more}`);
     const thoughtsRatio = thoughts / denom;
     const visibleRatio = Math.max(0, 1 - thoughtsRatio);
     const pct = (v) => `${Math.round(v * 100)}%`;
-    this.logger.info("[AI][Gemini] Usage Summary");
+    this.logger.info("\n[AI][Gemini] Usage Summary");
     this.logger.info(`prompt=${prompt}  total=${total}  output=${outputTotal}  candidates=${candidates}${thoughtsReported ? `  thoughtsReported=${thoughtsReported}` : ""}`);
     if (inferenceNote) {
       this.logger.info(`notes=${inferenceNote}`);
     }
-    this.logger.info(`\u26A0\uFE0F ${pct(thoughtsRatio)} internal reasoning, \u2705 ${pct(visibleRatio)} visible output (as share of output tokens)`);
+    this.logger.info(`\u26A0\uFE0F ${pct(thoughtsRatio)} internal reasoning, \u2705 ${pct(visibleRatio)} visible output (as share of output tokens)
+`);
     if (outputTotal === 0) {
       this.logger.warn("[AI][Gemini] No output tokens reported by API; consider increasing maxOutputTokens if finishReason=MAX_TOKENS.");
     } else if (thoughtsRatio > 0.9) {

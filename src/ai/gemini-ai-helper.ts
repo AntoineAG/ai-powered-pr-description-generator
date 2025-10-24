@@ -22,9 +22,9 @@ class GeminiAIHelper implements AIHelperInterface {
     try {
       const { model: modelName, temperature, maxOutputTokens: initialMaxOutputTokens, systemText } = this.config;
       const promptPreview = prompt.length > 2000 ? `${prompt.slice(0, 2000)}[...]` : prompt;
-      this.logger.info(`[AI][Gemini] Request model=${modelName} temperature=${temperature} maxOutputTokens=${initialMaxOutputTokens}`);
+      this.logger.info(`\n[AI][Gemini] Request model=${modelName} temperature=${temperature} maxOutputTokens=${initialMaxOutputTokens}`);
       this.logger.info(`[AI][Gemini] promptLength=${prompt.length}`);
-      this.logger.info(`[AI][Gemini] promptPreview=\n${promptPreview}`);
+      this.logger.info(`[AI][Gemini] promptPreview:\n${promptPreview}\n`);
 
       const payload: GenerateContentRequest = {
         contents: [
@@ -43,9 +43,9 @@ class GeminiAIHelper implements AIHelperInterface {
       let text = textFromParts;
       const usage: UsageMetadata | undefined = response.usageMetadata || (result as any).usageMetadata || undefined;
       const finishReason: FinishReason | undefined = response.candidates?.[0]?.finishReason;
-      this.logger.info(`[AI][Gemini] Response finishReason=${finishReason}`);
+      this.logger.info(`\n[AI][Gemini] Response finishReason=${finishReason}`);
       this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      this.logger.info(`[AI][Gemini] description=\n${text}`);
+      this.logger.info(`[AI][Gemini] description:\n${text}\n`);
 
       this.logUsageDiagnostics(usage, text);
 
@@ -79,8 +79,8 @@ class GeminiAIHelper implements AIHelperInterface {
           const contResp: EnhancedGenerateContentResponse = cont.response;
           const more = this.concatCandidatePartsText(contResp);
           const fr2: FinishReason | undefined = contResp.candidates?.[0]?.finishReason;
-          this.logger.info(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
-          this.logger.info(`[AI][Gemini] more=\n${more}`);
+          this.logger.info(`\n[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
+          this.logger.info(`[AI][Gemini] more:\n${more}\n`);
           text = (text + '\n\n' + more).trim();
         }
       }
@@ -220,12 +220,12 @@ class GeminiAIHelper implements AIHelperInterface {
     const pct = (v: number) => `${Math.round(v * 100)}%`;
 
     // Structured logs
-    this.logger.info('[AI][Gemini] Usage Summary');
+    this.logger.info('\n[AI][Gemini] Usage Summary');
     this.logger.info(`prompt=${prompt}  total=${total}  output=${outputTotal}  candidates=${candidates}${thoughtsReported ? `  thoughtsReported=${thoughtsReported}` : ''}`);
     if (inferenceNote) {
       this.logger.info(`notes=${inferenceNote}`);
     }
-    this.logger.info(`⚠️ ${pct(thoughtsRatio)} internal reasoning, ✅ ${pct(visibleRatio)} visible output (as share of output tokens)`);
+    this.logger.info(`⚠️ ${pct(thoughtsRatio)} internal reasoning, ✅ ${pct(visibleRatio)} visible output (as share of output tokens)\n`);
 
     // Recommendations
     if (outputTotal === 0) {
