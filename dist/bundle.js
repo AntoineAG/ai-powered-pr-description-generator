@@ -25043,39 +25043,42 @@ ${more}`);
     return buf.join("").trim();
   }
   logUsageDiagnostics(usage, text) {
-    const safeNum = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
-    const prompt = safeNum(usage?.promptTokenCount);
-    const candidates = safeNum(usage?.candidatesTokenCount);
-    let total = safeNum(usage?.totalTokenCount);
-    if (!total) total = prompt + candidates;
-    const approxVisible = Math.max(1, Math.ceil((text || "").length / 4));
-    let inferredThoughts = 0;
+    const num = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
+    const prompt = num(usage?.promptTokenCount);
+    const candidates = num(usage?.candidatesTokenCount);
+    const total = num(usage?.totalTokenCount);
+    const thoughtsReported = num(usage?.thoughtsTokenCount);
+    const outputTotal = Math.max(0, total - prompt);
+    const approxVisibleRaw = Math.max(0, Math.ceil((text || "").length / 4));
+    const visibleApprox = Math.min(approxVisibleRaw, outputTotal);
     let thoughts = 0;
-    if (candidates > 0) {
-      thoughts = Math.max(0, candidates - approxVisible);
-    } else if (total > prompt) {
-      inferredThoughts = total - prompt;
-      thoughts = inferredThoughts;
-      this.logger.warn(`\u26A0\uFE0F Output tokens not reported by API; inferring internal reasoning from total\u2212prompt \u2248 ${inferredThoughts}`);
+    let inferenceNote = null;
+    if (thoughtsReported > 0) {
+      thoughts = Math.min(thoughtsReported, outputTotal);
+    } else if (candidates > 0) {
+      thoughts = Math.max(0, Math.min(candidates - visibleApprox, outputTotal));
+      inferenceNote = "estimated from candidates \u2212 visible";
     } else {
-      thoughts = 0;
+      thoughts = Math.max(0, outputTotal - visibleApprox);
+      if (outputTotal > 0) {
+        inferenceNote = "inferred from (total \u2212 prompt) \u2212 visible";
+      }
     }
-    const den = Math.max(1, total || candidates || prompt);
-    const thoughtsRatioTotal = thoughts / den;
-    const visibleRatioTotal = Math.max(0, 1 - thoughtsRatioTotal);
-    const percent = (v) => `${Math.round(v * 100)}%`;
-    const thoughtsPct = percent(thoughtsRatioTotal);
-    const visiblePct = percent(visibleRatioTotal);
+    const denom = Math.max(1, outputTotal);
+    const thoughtsRatio = thoughts / denom;
+    const visibleRatio = Math.max(0, 1 - thoughtsRatio);
+    const pct = (v) => `${Math.round(v * 100)}%`;
     this.logger.info("[AI][Gemini] Usage Summary");
-    if (inferredThoughts > 0) {
-      this.logger.info(`prompt=${prompt}  total=${total}  inferredThoughts=${inferredThoughts}`);
-    } else {
-      this.logger.info(`prompt=${prompt}  total=${total}  thoughts=${thoughts}  candidates=${candidates}`);
+    this.logger.info(`prompt=${prompt}  total=${total}  output=${outputTotal}  candidates=${candidates}${thoughtsReported ? `  thoughtsReported=${thoughtsReported}` : ""}`);
+    if (inferenceNote) {
+      this.logger.info(`notes=${inferenceNote}`);
     }
-    this.logger.info(`\u26A0\uFE0F ${thoughtsPct} internal reasoning, \u2705 ${visiblePct} visible output`);
-    if (thoughtsRatioTotal > 0.9) {
-      this.logger.warn("[AI][Gemini] High thoughts/total token ratio (>90%). Consider increasing maxOutputTokens.");
-    } else if (thoughtsRatioTotal >= 0.2 && thoughtsRatioTotal <= 0.3) {
+    this.logger.info(`\u26A0\uFE0F ${pct(thoughtsRatio)} internal reasoning, \u2705 ${pct(visibleRatio)} visible output (as share of output tokens)`);
+    if (outputTotal === 0) {
+      this.logger.warn("[AI][Gemini] No output tokens reported by API; consider increasing maxOutputTokens if finishReason=MAX_TOKENS.");
+    } else if (thoughtsRatio > 0.9) {
+      this.logger.warn("[AI][Gemini] High thoughts/output token ratio (>90%). Consider increasing maxOutputTokens or tightening the prompt.");
+    } else if (thoughtsRatio >= 0.2 && thoughtsRatio <= 0.3) {
       this.logger.info("\u2705 Balanced usage");
     }
   }
