@@ -392,7 +392,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug("making CONNECT request");
+      debug2("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -412,7 +412,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug(
+          debug2(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -424,7 +424,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug("got illegal response body from proxy");
+          debug2("got illegal response body from proxy");
           socket.destroy();
           var error4 = new Error("got illegal response body from proxy");
           error4.code = "ECONNRESET";
@@ -432,13 +432,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug("tunneling connection has established");
+        debug2("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug(
+        debug2(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -500,9 +500,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug;
+    var debug2;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug = function() {
+      debug2 = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -512,10 +512,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug = function() {
+      debug2 = function() {
       };
     }
-    exports2.debug = debug;
+    exports2.debug = debug2;
   }
 });
 
@@ -17575,12 +17575,12 @@ var require_lib = __commonJS({
             throw new Error("Client has already been disposed.");
           }
           const parsedUrl = new URL(requestUrl);
-          let info6 = this._prepareRequest(verb, parsedUrl, headers);
+          let info5 = this._prepareRequest(verb, parsedUrl, headers);
           const maxTries = this._allowRetries && RetryableHttpVerbs.includes(verb) ? this._maxRetries + 1 : 1;
           let numTries = 0;
           let response;
           do {
-            response = yield this.requestRaw(info6, data);
+            response = yield this.requestRaw(info5, data);
             if (response && response.message && response.message.statusCode === HttpCodes.Unauthorized) {
               let authenticationHandler;
               for (const handler of this.handlers) {
@@ -17590,7 +17590,7 @@ var require_lib = __commonJS({
                 }
               }
               if (authenticationHandler) {
-                return authenticationHandler.handleAuthentication(this, info6, data);
+                return authenticationHandler.handleAuthentication(this, info5, data);
               } else {
                 return response;
               }
@@ -17613,8 +17613,8 @@ var require_lib = __commonJS({
                   }
                 }
               }
-              info6 = this._prepareRequest(verb, parsedRedirectUrl, headers);
-              response = yield this.requestRaw(info6, data);
+              info5 = this._prepareRequest(verb, parsedRedirectUrl, headers);
+              response = yield this.requestRaw(info5, data);
               redirectsRemaining--;
             }
             if (!response.message.statusCode || !HttpResponseRetryCodes.includes(response.message.statusCode)) {
@@ -17643,7 +17643,7 @@ var require_lib = __commonJS({
        * @param info
        * @param data
        */
-      requestRaw(info6, data) {
+      requestRaw(info5, data) {
         return __awaiter(this, void 0, void 0, function* () {
           return new Promise((resolve, reject) => {
             function callbackForResult(err, res) {
@@ -17655,7 +17655,7 @@ var require_lib = __commonJS({
                 resolve(res);
               }
             }
-            this.requestRawWithCallback(info6, data, callbackForResult);
+            this.requestRawWithCallback(info5, data, callbackForResult);
           });
         });
       }
@@ -17665,12 +17665,12 @@ var require_lib = __commonJS({
        * @param data
        * @param onResult
        */
-      requestRawWithCallback(info6, data, onResult) {
+      requestRawWithCallback(info5, data, onResult) {
         if (typeof data === "string") {
-          if (!info6.options.headers) {
-            info6.options.headers = {};
+          if (!info5.options.headers) {
+            info5.options.headers = {};
           }
-          info6.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
+          info5.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
         }
         let callbackCalled = false;
         function handleResult(err, res) {
@@ -17679,7 +17679,7 @@ var require_lib = __commonJS({
             onResult(err, res);
           }
         }
-        const req = info6.httpModule.request(info6.options, (msg) => {
+        const req = info5.httpModule.request(info5.options, (msg) => {
           const res = new HttpClientResponse(msg);
           handleResult(void 0, res);
         });
@@ -17691,7 +17691,7 @@ var require_lib = __commonJS({
           if (socket) {
             socket.end();
           }
-          handleResult(new Error(`Request timeout: ${info6.options.path}`));
+          handleResult(new Error(`Request timeout: ${info5.options.path}`));
         });
         req.on("error", function(err) {
           handleResult(err);
@@ -17727,27 +17727,27 @@ var require_lib = __commonJS({
         return this._getProxyAgentDispatcher(parsedUrl, proxyUrl);
       }
       _prepareRequest(method, requestUrl, headers) {
-        const info6 = {};
-        info6.parsedUrl = requestUrl;
-        const usingSsl = info6.parsedUrl.protocol === "https:";
-        info6.httpModule = usingSsl ? https : http;
+        const info5 = {};
+        info5.parsedUrl = requestUrl;
+        const usingSsl = info5.parsedUrl.protocol === "https:";
+        info5.httpModule = usingSsl ? https : http;
         const defaultPort = usingSsl ? 443 : 80;
-        info6.options = {};
-        info6.options.host = info6.parsedUrl.hostname;
-        info6.options.port = info6.parsedUrl.port ? parseInt(info6.parsedUrl.port) : defaultPort;
-        info6.options.path = (info6.parsedUrl.pathname || "") + (info6.parsedUrl.search || "");
-        info6.options.method = method;
-        info6.options.headers = this._mergeHeaders(headers);
+        info5.options = {};
+        info5.options.host = info5.parsedUrl.hostname;
+        info5.options.port = info5.parsedUrl.port ? parseInt(info5.parsedUrl.port) : defaultPort;
+        info5.options.path = (info5.parsedUrl.pathname || "") + (info5.parsedUrl.search || "");
+        info5.options.method = method;
+        info5.options.headers = this._mergeHeaders(headers);
         if (this.userAgent != null) {
-          info6.options.headers["user-agent"] = this.userAgent;
+          info5.options.headers["user-agent"] = this.userAgent;
         }
-        info6.options.agent = this._getAgent(info6.parsedUrl);
+        info5.options.agent = this._getAgent(info5.parsedUrl);
         if (this.handlers) {
           for (const handler of this.handlers) {
-            handler.prepareRequest(info6.options);
+            handler.prepareRequest(info5.options);
           }
         }
-        return info6;
+        return info5;
       }
       _mergeHeaders(headers) {
         if (this.requestOptions && this.requestOptions.headers) {
@@ -19721,10 +19721,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug(message) {
+    function debug2(message) {
       (0, command_1.issueCommand)("debug", {}, message);
     }
-    exports2.debug = debug;
+    exports2.debug = debug2;
     function error4(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -19737,26 +19737,26 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.notice = notice;
-    function info6(message) {
+    function info5(message) {
       process.stdout.write(message + os.EOL);
     }
-    exports2.info = info6;
-    function startGroup4(name) {
+    exports2.info = info5;
+    function startGroup3(name) {
       (0, command_1.issue)("group", name);
     }
-    exports2.startGroup = startGroup4;
-    function endGroup4() {
+    exports2.startGroup = startGroup3;
+    function endGroup3() {
       (0, command_1.issue)("endgroup");
     }
-    exports2.endGroup = endGroup4;
+    exports2.endGroup = endGroup3;
     function group(name, fn) {
       return __awaiter(this, void 0, void 0, function* () {
-        startGroup4(name);
+        startGroup3(name);
         let result;
         try {
           result = yield fn();
         } finally {
-          endGroup4();
+          endGroup3();
         }
         return result;
       });
@@ -23865,15 +23865,12 @@ var require_github = __commonJS({
 });
 
 // src/pull-request-updater.ts
-var core5 = __toESM(require_core());
+var core4 = __toESM(require_core());
 var import_core = __toESM(require_core());
 var import_github = __toESM(require_github());
 
 // src/ai/ai-helper-resolver.ts
-var core3 = __toESM(require_core());
-
-// src/ai/gemini-ai-helper.ts
-var core = __toESM(require_core());
+var core2 = __toESM(require_core());
 
 // node_modules/@google/generative-ai/dist/index.mjs
 var SchemaType;
@@ -24884,205 +24881,196 @@ var GoogleGenerativeAI = class {
 
 // src/ai/gemini-ai-helper.ts
 var GeminiAIHelper = class {
-  apiKey;
-  temperature;
-  model;
-  constructor(aiHelperParams) {
-    Object.assign(this, aiHelperParams);
+  config;
+  logger;
+  currentModelName = null;
+  currentModel = null;
+  constructor(params) {
+    this.config = params.config;
+    this.logger = params.logger;
   }
-  async createPullRequestDescription(diffOutput, prompt) {
+  async createPullRequestDescription(_diffOutput, prompt) {
     try {
-      const modelName = this.model?.trim() || "gemini-2.5-flash";
-      const maxTokensEnv = Number.parseInt(process.env.MAX_OUTPUT_TOKENS || "", 10);
-      const initialMaxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? Math.max(768, maxTokensEnv) : 1024;
+      const { model: modelName, temperature, maxOutputTokens: initialMaxOutputTokens, systemText } = this.config;
       const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
-      core.startGroup("[AI][Gemini] Request");
-      core.info(`model=${modelName} temperature=${this.temperature} maxOutputTokens=${initialMaxOutputTokens}`);
-      core.info(`promptLength=${prompt.length}`);
-      core.info(`promptPreview:
+      this.logger.info(`[AI][Gemini] Request model=${modelName} temperature=${temperature} maxOutputTokens=${initialMaxOutputTokens}`);
+      this.logger.debug?.(`[AI][Gemini] promptLength=${prompt.length}`);
+      this.logger.debug?.(`[AI][Gemini] promptPreview=
 ${promptPreview}`);
-      core.endGroup();
-      const systemText = "You are very good at reviewing code and can generate pull request descriptions.";
-      const genAI = new GoogleGenerativeAI(this.apiKey);
-      const modelCache = /* @__PURE__ */ new Map();
-      const getModel = (name) => {
-        let m = modelCache.get(name);
-        if (!m) {
-          m = genAI.getGenerativeModel({
-            model: name,
-            ...name.toLocaleLowerCase().startsWith("gemini-2") ? { systemInstruction: systemText } : {}
-          });
-          modelCache.set(name, m);
-        }
-        return m;
-      };
-      const generateWithRetry = async (payload2, initialModel) => {
-        const maxAttempts = 100;
-        const baseDelayMs = 1e3;
-        const maxDelayMs = 3e4;
-        const jitterMs = 250;
-        const ladder = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-flash"];
-        const ordered = [initialModel, ...ladder.filter((m) => m !== initialModel)];
-        let currentModelIndex = 0;
-        let currentModel = ordered[currentModelIndex];
-        let consecutive503 = 0;
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs) + Math.floor(Math.random() * jitterMs);
-          core.startGroup(`[AI][Gemini] Attempt ${attempt} model=${currentModel}`);
-          try {
-            const localModel = getModel(currentModel);
-            const res = await localModel.generateContent(payload2);
-            core.info(`[AI][Gemini] success on attempt=${attempt} model=${currentModel}`);
-            core.endGroup();
-            return { result: res, modelUsed: currentModel };
-          } catch (err) {
-            const status = typeof err?.status === "number" ? err.status : void 0;
-            const statusText = typeof err?.statusText === "string" ? err.statusText : void 0;
-            const msg = err && err.message ? err.message : String(err);
-            const is429 = status === 429 || /\b429\b/.test(msg);
-            const is503 = status === 503 || /\b503\b/.test(msg) || /overload|unavailable|temporarily/i.test(msg);
-            if (is503) consecutive503++;
-            else consecutive503 = 0;
-            if (is429 || is503) {
-              if (is503 && consecutive503 > 10 && currentModelIndex < ordered.length - 1) {
-                const nextModel = ordered[++currentModelIndex];
-                core.warning(`[AI][Gemini] persistent 503 after ${consecutive503} attempts; switching model ${currentModel} -> ${nextModel}`);
-                currentModel = nextModel;
-              }
-              core.warning(`[AI][Gemini] retryable error status=${status ?? "n/a"} text=${statusText ?? ""} message=${msg}`);
-              core.warning(`[AI][Gemini] will retry attempt=${attempt + 1} in ${delay}ms (exponential backoff + jitter)`);
-              core.endGroup();
-              if (attempt >= maxAttempts) throw err;
-              await new Promise((r) => setTimeout(r, delay));
-              continue;
-            }
-            core.warning(`[AI][Gemini] non-retryable error on attempt=${attempt}: ${msg}`);
-            core.endGroup();
-            throw err;
-          }
-        }
-        throw new Error("Exhausted retry attempts for Gemini generateContent");
-      };
       const payload = {
         contents: [
-          { role: "user", parts: [{ text: !modelName.toLocaleLowerCase().startsWith("gemini-2") ? `${systemText}
+          { role: "user", parts: [{ text: !this.supportsSystemInstruction(modelName) ? `${systemText}
 
 ${prompt}` : prompt }] }
         ],
         generationConfig: {
-          temperature: this.temperature,
+          temperature,
           maxOutputTokens: initialMaxOutputTokens
         }
       };
-      const { result, modelUsed } = await generateWithRetry(payload, modelName);
+      const { result, modelUsed } = await this.generateWithRetry(payload, modelName);
       const response = result.response;
-      const concatCandidatePartsText = (resp) => {
-        try {
-          const parts = resp?.candidates?.[0]?.content?.parts || [];
-          const buf = [];
-          for (const p of parts) {
-            if (typeof p?.text === "string") buf.push(p.text);
-          }
-          return buf.join("").trim();
-        } catch {
-          try {
-            return response.text()?.trim?.() || "";
-          } catch {
-            return "";
-          }
-        }
-      };
-      let text = concatCandidatePartsText(response);
+      const textFromParts = this.concatCandidatePartsText(response);
+      let text = textFromParts;
       const usage = response.usageMetadata || result.usageMetadata || void 0;
-      const finishReason = response.candidates?.[0]?.finishReason || result.candidates?.[0]?.finishReason;
-      core.startGroup("[AI][Gemini] Response");
-      core.info(`finishReason=${finishReason}`);
-      core.info(`usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      core.info(`description:
+      const finishReason = response.candidates?.[0]?.finishReason;
+      this.logger.info(`[AI][Gemini] Response finishReason=${finishReason}`);
+      this.logger.debug?.(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
+      this.logger.debug?.(`[AI][Gemini] description=
 ${text}`);
-      core.endGroup();
-      const safeNum = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
-      const promptTokenCount = safeNum(usage?.promptTokenCount);
-      const candidatesTokenCount = safeNum(usage?.candidatesTokenCount);
-      let totalTokenCount = safeNum(usage?.totalTokenCount);
-      if (!totalTokenCount) totalTokenCount = promptTokenCount + candidatesTokenCount;
-      const approxVisibleTokens = Math.max(1, Math.ceil((text || "").length / 4));
-      const thoughtsTokenCount = Math.max(0, candidatesTokenCount - approxVisibleTokens);
-      const outputDen = Math.max(1, candidatesTokenCount);
-      const thoughtsRatioOutput = thoughtsTokenCount / outputDen;
-      const thoughtsRatioTotal = totalTokenCount > 0 ? thoughtsTokenCount / totalTokenCount : 0;
-      const visibleRatioOutput = Math.max(0, 1 - thoughtsRatioOutput);
-      core.startGroup("[AI][Gemini] Usage Diagnostics");
-      core.info(`promptTokenCount=${promptTokenCount}`);
-      core.info(`candidatesTokenCount=${candidatesTokenCount}`);
-      core.info(`thoughtsTokenCount=${thoughtsTokenCount}`);
-      core.info(`totalTokenCount=${totalTokenCount}`);
-      const percent = (v) => `${Math.round(v * 100)}%`;
-      const thoughtsPct = percent(thoughtsRatioOutput);
-      const visiblePct = percent(visibleRatioOutput);
-      core.warning(`\u26A0\uFE0F ${thoughtsPct} of output tokens spent on internal reasoning (thoughts)`);
-      core.info(`\u2705 ${visiblePct} used for visible content`);
-      if (thoughtsRatioTotal > 0.9) {
-        core.warning("[AI][Gemini] High thoughts/total token ratio (>90%). Consider increasing maxOutputTokens.");
-      } else if (thoughtsRatioOutput >= 0.2 && thoughtsRatioOutput <= 0.3) {
-        core.info("[AI][Gemini] Balanced usage: ~20\u201330% thoughts vs output tokens.");
-      }
-      core.endGroup();
-      if (finishReason === "MAX_TOKENS") {
+      this.logUsageDiagnostics(usage, text);
+      if (finishReason === FinishReason.MAX_TOKENS) {
         if (!text || text.trim().length === 0) {
           const bumped = Math.ceil(initialMaxOutputTokens * 1.5);
-          core.info(`[AI][Gemini] finishReason=MAX_TOKENS with empty output; retrying once with maxOutputTokens=${bumped}`);
+          this.logger.info(`[AI][Gemini] MAX_TOKENS with empty output; retry maxOutputTokens=${bumped}`);
           const retryPayload = {
             contents: [
-              { role: "user", parts: [{ text: !modelName.toLocaleLowerCase().startsWith("gemini-2") ? `${systemText}
+              { role: "user", parts: [{ text: !this.supportsSystemInstruction(modelName) ? `${systemText}
 
 ${prompt}` : prompt }] }
             ],
-            generationConfig: { temperature: this.temperature, maxOutputTokens: bumped }
+            generationConfig: { temperature, maxOutputTokens: bumped }
           };
-          const res = await getModel(modelUsed).generateContent(retryPayload);
+          const res = await this.ensureModel(modelUsed).generateContent(retryPayload);
           const retryResp = res.response;
-          const retryText = concatCandidatePartsText(retryResp);
+          const retryText = this.concatCandidatePartsText(retryResp);
           const frRetry = retryResp.candidates?.[0]?.finishReason;
-          core.startGroup("[AI][Gemini] Retry (Increased maxOutputTokens)");
-          core.info(`finishReason=${frRetry}`);
-          core.info(`descLength=${retryText.length}`);
-          core.endGroup();
+          this.logger.info(`[AI][Gemini] Retry finishReason=${frRetry} length=${retryText.length}`);
           text = retryText;
         } else {
-          core.info("[AI][Gemini] continuation: finishReason=MAX_TOKENS with non-empty output, requesting continuation...");
+          this.logger.info("[AI][Gemini] continuation: MAX_TOKENS with non-empty output, requesting continuation...");
           const contPayload = {
             contents: [
               { role: "user", parts: [{ text: prompt }] },
               { role: "model", parts: [{ text }] },
               { role: "user", parts: [{ text: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }] }
             ],
-            generationConfig: { temperature: this.temperature, maxOutputTokens: initialMaxOutputTokens }
+            generationConfig: { temperature, maxOutputTokens: initialMaxOutputTokens }
           };
-          const cont = await getModel(modelUsed).generateContent(contPayload);
+          const cont = await this.ensureModel(modelUsed).generateContent(contPayload);
           const contResp = cont.response;
-          const more = concatCandidatePartsText(contResp);
+          const more = this.concatCandidatePartsText(contResp);
           const fr2 = contResp.candidates?.[0]?.finishReason;
-          core.startGroup("[AI][Gemini] Continuation Response");
-          core.info(`finishReason=${fr2}`);
-          core.info(`moreLength=${more.length}`);
-          core.info(`more:
+          this.logger.debug?.(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
+          this.logger.debug?.(`[AI][Gemini] more=
 ${more}`);
-          core.endGroup();
-          text = (text + more).trim();
+          text = (text + "\n\n" + more).trim();
         }
       }
       return text;
     } catch (error4) {
-      core.error(`[AI][Gemini] exception message=${error4.message}`);
+      this.logger.error(`[AI][Gemini] exception message=${error4.message}`);
       throw new Error(`Gemini API Error: ${error4.message}`);
+    }
+  }
+  // Retry helper with fallback ladder
+  async generateWithRetry(payload, initialModel) {
+    const maxAttempts = 100;
+    const baseDelayMs = 1e3;
+    const maxDelayMs = 3e4;
+    const jitterMs = 250;
+    const ladder = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-flash"];
+    const ordered = [initialModel, ...ladder.filter((m) => m !== initialModel)];
+    let currentModelIndex = 0;
+    let currentModel = ordered[currentModelIndex];
+    let consecutive503 = 0;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs) + Math.floor(Math.random() * jitterMs);
+      this.logger.info(`[AI][Gemini] Attempt ${attempt} model=${currentModel}`);
+      try {
+        const localModel = this.ensureModel(currentModel);
+        const res = await localModel.generateContent(payload);
+        this.logger.info(`[AI][Gemini] success attempt=${attempt} model=${currentModel}`);
+        return { result: res, modelUsed: currentModel };
+      } catch (err) {
+        const e = err;
+        const status = typeof e?.status === "number" ? e.status : void 0;
+        const statusText = typeof e?.statusText === "string" ? e.statusText : void 0;
+        const msg = e?.message ?? String(err);
+        const is429 = status === 429 || /\b429\b/.test(msg);
+        const is503 = status === 503 || /\b503\b/.test(msg) || /overload|unavailable|temporarily/i.test(msg);
+        if (is503) consecutive503++;
+        else consecutive503 = 0;
+        if (is429 || is503) {
+          if (is503 && consecutive503 > 10 && currentModelIndex < ordered.length - 1) {
+            const nextModel = ordered[++currentModelIndex];
+            this.logger.warn(`[AI][Gemini] persistent 503 after ${consecutive503} attempts; switching model ${currentModel} -> ${nextModel}`);
+            currentModel = nextModel;
+          }
+          this.logger.warn(`[AI][Gemini] retryable error status=${status ?? "n/a"} text=${statusText ?? ""} message=${msg}`);
+          this.logger.warn(`[AI][Gemini] will retry attempt=${attempt + 1} in ${delay}ms (exponential backoff + jitter)`);
+          if (attempt >= maxAttempts) throw err;
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+        this.logger.warn(`[AI][Gemini] non-retryable error attempt=${attempt}: ${msg}`);
+        throw err;
+      }
+    }
+    throw new Error("Exhausted retry attempts for Gemini generateContent");
+  }
+  // Build or reuse model instance
+  ensureModel(name) {
+    if (this.currentModelName === name && this.currentModel) return this.currentModel;
+    this.currentModel = this.buildModel(name);
+    this.currentModelName = name;
+    return this.currentModel;
+  }
+  // Provider adapter – encapsulates Gemini SDK specifics
+  buildModel(name) {
+    const client = new GoogleGenerativeAI(this.config.apiKey);
+    const params = {
+      model: name,
+      ...this.supportsSystemInstruction(name) ? { systemInstruction: this.config.systemText } : {}
+    };
+    return client.getGenerativeModel(params);
+  }
+  supportsSystemInstruction(name) {
+    return name.toLowerCase().startsWith("gemini-2");
+  }
+  concatCandidatePartsText(resp) {
+    const parts = resp?.candidates?.[0]?.content?.parts || [];
+    const buf = [];
+    for (const p of parts) {
+      if (typeof p?.text === "string") buf.push(p.text);
+    }
+    if (buf.length === 0) {
+      try {
+        return resp.text()?.trim?.() || "";
+      } catch {
+      }
+    }
+    return buf.join("").trim();
+  }
+  logUsageDiagnostics(usage, text) {
+    const safeNum = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
+    const promptTokenCount = safeNum(usage?.promptTokenCount);
+    const candidatesTokenCount = safeNum(usage?.candidatesTokenCount);
+    let totalTokenCount = safeNum(usage?.totalTokenCount);
+    if (!totalTokenCount) totalTokenCount = promptTokenCount + candidatesTokenCount;
+    const approxVisibleTokens = Math.max(1, Math.ceil((text || "").length / 4));
+    const thoughtsTokenCount = Math.max(0, candidatesTokenCount - approxVisibleTokens);
+    const outputDen = Math.max(1, candidatesTokenCount);
+    const thoughtsRatioOutput = thoughtsTokenCount / outputDen;
+    const thoughtsRatioTotal = totalTokenCount > 0 ? thoughtsTokenCount / totalTokenCount : 0;
+    const visibleRatioOutput = Math.max(0, 1 - thoughtsRatioOutput);
+    const percent = (v) => `${Math.round(v * 100)}%`;
+    const thoughtsPct = percent(thoughtsRatioOutput);
+    const visiblePct = percent(visibleRatioOutput);
+    this.logger.info(`[AI][Gemini] Usage Diagnostics prompt=${promptTokenCount} candidates=${candidatesTokenCount} thoughts=${thoughtsTokenCount} total=${totalTokenCount}`);
+    this.logger.warn(`\u26A0\uFE0F ${thoughtsPct} internal reasoning`);
+    this.logger.info(`\u2705 ${visiblePct} visible content`);
+    if (thoughtsRatioTotal > 0.9) {
+      this.logger.warn("[AI][Gemini] High thoughts/total token ratio (>90%). Consider increasing maxOutputTokens.");
+    } else if (thoughtsRatioOutput >= 0.2 && thoughtsRatioOutput <= 0.3) {
+      this.logger.info("[AI][Gemini] Balanced usage: ~20\u201330% thoughts vs output tokens.");
     }
   }
 };
 var gemini_ai_helper_default = GeminiAIHelper;
 
 // src/ai/open-ai-helper.ts
-var core2 = __toESM(require_core());
+var core = __toESM(require_core());
 var OpenAIHelper = class {
   apiKey;
   temperature;
@@ -25094,12 +25082,12 @@ var OpenAIHelper = class {
     try {
       const modelName = this.model?.trim() || "gpt-4.1";
       const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
-      core2.startGroup("[AI][OpenAI] Request");
-      core2.info(`model=${modelName} temperature=${this.temperature}`);
-      core2.info(`promptLength=${prompt.length}`);
-      core2.info(`truncatedPreview:
+      core.startGroup("[AI][OpenAI] Request");
+      core.info(`model=${modelName} temperature=${this.temperature}`);
+      core.info(`promptLength=${prompt.length}`);
+      core.info(`truncatedPreview:
 ${promptPreview}`);
-      core2.endGroup();
+      core.endGroup();
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -25118,31 +25106,31 @@ ${promptPreview}`);
       });
       const raw = await response.text();
       if (!response.ok) {
-        core2.error(`[AI][OpenAI] http_error status=${response.status} body=${raw}`);
+        core.error(`[AI][OpenAI] http_error status=${response.status} body=${raw}`);
         throw new Error(`OpenAI API HTTP ${response.status}: ${raw}`);
       }
       let data;
       try {
         data = JSON.parse(raw);
       } catch (e) {
-        core2.error(`[AI][OpenAI] parse_error body=${raw}`);
+        core.error(`[AI][OpenAI] parse_error body=${raw}`);
         throw e;
       }
       if (data.error) {
-        core2.error(`[AI][OpenAI] api_error code=${data.error.code || ""} message=${data.error.message || ""}`);
+        core.error(`[AI][OpenAI] api_error code=${data.error.code || ""} message=${data.error.message || ""}`);
         throw new Error(`OpenAI API Error: ${data.error.message}`);
       }
       let description = (data.choices?.[0]?.message?.content || "").trim();
       const finishReason = data.choices?.[0]?.finish_reason || data.choices?.[0]?.finishReason;
       const usage = data.usage || {};
-      core2.startGroup("[AI][OpenAI] Response");
-      core2.info(`finishReason=${finishReason}`);
-      core2.info(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
-      core2.info(`description:
+      core.startGroup("[AI][OpenAI] Response");
+      core.info(`finishReason=${finishReason}`);
+      core.info(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
+      core.info(`description:
 ${description}`);
-      core2.endGroup();
+      core.endGroup();
       if (finishReason === "length") {
-        core2.info("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
+        core.info("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
         const contResp = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -25171,20 +25159,20 @@ ${description}`);
           }
           const more = (contData.choices?.[0]?.message?.content || "").trim();
           const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
-          core2.startGroup("[AI][OpenAI] Continuation Response");
-          core2.info(`finishReason=${fr2}`);
-          core2.info(`moreLength=${more.length}`);
-          core2.info(`more:
+          core.startGroup("[AI][OpenAI] Continuation Response");
+          core.info(`finishReason=${fr2}`);
+          core.info(`moreLength=${more.length}`);
+          core.info(`more:
 ${more}`);
-          core2.endGroup();
+          core.endGroup();
           description = (description + "\n\n" + more).trim();
         } else {
-          core2.warning(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
+          core.warning(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
         }
       }
       return description;
     } catch (error4) {
-      core2.error(`[AI][OpenAI] exception message=${error4.message}`);
+      core.error(`[AI][OpenAI] exception message=${error4.message}`);
       throw new Error(`OpenAI API Error: ${error4.message}`);
     }
   }
@@ -25194,20 +25182,38 @@ var open_ai_helper_default = OpenAIHelper;
 // src/ai/ai-helper-resolver.ts
 var aiHelperResolver = (aiHelperParams) => {
   const { aiName, model, temperature } = aiHelperParams;
-  core3.info(`[AI] Resolver -> provider=${aiName}, model=${model}, temperature=${temperature}`);
+  core2.info(`[AI] Resolver -> provider=${aiName}, model=${model}, temperature=${temperature}`);
   switch (aiName) {
     case "open-ai":
     case "openai":
       return new open_ai_helper_default(aiHelperParams);
     case "gemini":
-    default:
-      return new gemini_ai_helper_default(aiHelperParams);
+    default: {
+      const modelName = (model || "gemini-2.5-flash").trim();
+      const maxTokensEnv = Number.parseInt(process.env.MAX_OUTPUT_TOKENS || "", 10);
+      const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? Math.max(768, maxTokensEnv) : 1024;
+      const systemText = "You are very good at reviewing code and can generate pull request descriptions.";
+      const config = {
+        apiKey: aiHelperParams.apiKey,
+        model: modelName,
+        temperature: aiHelperParams.temperature,
+        maxOutputTokens,
+        systemText
+      };
+      const logger = {
+        info: (msg) => core2.info(msg),
+        warn: (msg) => core2.warning(msg),
+        error: (msg) => core2.error(msg),
+        debug: (msg) => core2.debug ? core2.debug(msg) : core2.info(msg)
+      };
+      return new gemini_ai_helper_default({ config, logger });
+    }
   }
 };
 var ai_helper_resolver_default = aiHelperResolver;
 
 // src/git-helper.ts
-var core4 = __toESM(require_core());
+var core3 = __toESM(require_core());
 var import_child_process = require("child_process");
 var GitHelper = class {
   ignores;
@@ -25227,9 +25233,9 @@ var GitHelper = class {
       ":!**/dist/*"
     ];
     const ignoreFiles = this.ignores ? this.ignores.split(",").map((item) => `:!${item.trim()}`) : defaultIgnoreFiles;
-    core4.info(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
+    core3.info(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
     const diffOutput = (0, import_child_process.execSync)(`git diff origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(" ")}`, { encoding: "utf8" });
-    core4.info(`Filtered diff length: ${diffOutput.length}`);
+    core3.info(`Filtered diff length: ${diffOutput.length}`);
     return diffOutput;
   }
 };
@@ -25248,7 +25254,7 @@ var PullRequestUpdater = class {
     const apiKey = (0, import_core.getInput)("api_key", { required: true }).trim();
     const temperature = Number.parseFloat((0, import_core.getInput)("temperature") || "0.8");
     this.aiHelper = ai_helper_resolver_default({ apiKey, aiName, temperature, model });
-    core5.info(`[PR-Description] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
+    core4.info(`[PR-Description] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
     const githubToken = (0, import_core.getInput)("github_token", { required: true }).trim();
     this.octokit = (0, import_github.getOctokit)(githubToken);
   }
@@ -25285,29 +25291,29 @@ var PullRequestUpdater = class {
       const { baseBranch, headBranch } = this.extractBranchRefs();
       this.gitHelper.setupGitConfiguration();
       await this.gitHelper.fetchGitBranches(baseBranch, headBranch);
-      core5.startGroup("Diff and Prompt");
+      core4.startGroup("Diff and Prompt");
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
-      core5.info(`[PR-Description] diff length=${diffOutput.length}`);
+      core4.info(`[PR-Description] diff length=${diffOutput.length}`);
       const prompt = this.generatePrompt(diffOutput, creator);
-      core5.info(`[PR-Description] prompt length=${prompt.length}`);
-      core5.endGroup();
-      core5.startGroup("AI Generation");
-      core5.info("[PR-Description] calling AI to generate description");
+      core4.info(`[PR-Description] prompt length=${prompt.length}`);
+      core4.endGroup();
+      core4.startGroup("AI Generation");
+      core4.info("[PR-Description] calling AI to generate description");
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
-      core5.info(`[PR-Description] AI description length=${generatedDescription.length}`);
-      core5.info(`[PR-Description] AI description content:
+      core4.info(`[PR-Description] AI description length=${generatedDescription.length}`);
+      core4.info(`[PR-Description] AI description content:
 ${generatedDescription}`);
-      core5.endGroup();
-      core5.startGroup("PR Update");
-      core5.info(`[PR-Description] updating pull request #${pullRequestNumber}`);
+      core4.endGroup();
+      core4.startGroup("PR Update");
+      core4.info(`[PR-Description] updating pull request #${pullRequestNumber}`);
       await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
-      core5.endGroup();
+      core4.endGroup();
       (0, import_core.setOutput)("pr_number", pullRequestNumber.toString());
       (0, import_core.setOutput)("description", generatedDescription);
-      core5.info(`Successfully updated PR #${pullRequestNumber} description.`);
+      core4.info(`Successfully updated PR #${pullRequestNumber} description.`);
     } catch (error4) {
       const errorMessage = error4 instanceof Error ? error4.message : "Unknown error";
-      core5.setFailed(errorMessage);
+      core4.setFailed(errorMessage);
     }
   }
   validateEventContext() {
@@ -25319,8 +25325,8 @@ ${generatedDescription}`);
   extractBranchRefs() {
     const baseBranch = this.context.payload.pull_request.base.ref;
     const headBranch = this.context.payload.pull_request.head.ref;
-    core5.info(`Base branch: ${baseBranch}`);
-    core5.info(`Head branch: ${headBranch}`);
+    core4.info(`Base branch: ${baseBranch}`);
+    core4.info(`Head branch: ${headBranch}`);
     return { baseBranch, headBranch };
   }
   async updatePullRequestDescription(pullRequestNumber, generatedDescription) {
@@ -25333,12 +25339,12 @@ ${generatedDescription}`);
           currentDescription
         );
       }
-      core5.info(`[PR-Description] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
-      core5.info(`[PR-Description] new description content:
+      core4.info(`[PR-Description] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
+      core4.info(`[PR-Description] new description content:
 ${generatedDescription}`);
       await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
     } catch (error4) {
-      core5.error(`Error updating PR #${pullRequestNumber} description: ${error4.message}`);
+      core4.error(`Error updating PR #${pullRequestNumber} description: ${error4.message}`);
       throw error4;
     }
   }
@@ -25354,7 +25360,7 @@ ${generatedDescription}`);
     return this.context.payload.pull_request.head.ref.replace("feat/", "").replace("fix/", "");
   }
   async postOriginalDescriptionComment(pullRequestNumber, currentDescription) {
-    core5.info("Creating comment with original description...");
+    core4.info("Creating comment with original description...");
     await this.octokit.rest.issues.createComment({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
@@ -25363,17 +25369,17 @@ ${generatedDescription}`);
 
 ${currentDescription}`
     });
-    core5.info("Comment created successfully.");
+    core4.info("Comment created successfully.");
   }
   async applyPullRequestUpdate(pullRequestNumber, newDescription) {
-    core5.info("Updating PR description...");
+    core4.info("Updating PR description...");
     await this.octokit.rest.pulls.update({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       pull_number: pullRequestNumber,
       body: newDescription
     });
-    core5.info("PR description updated successfully.");
+    core4.info("PR description updated successfully.");
   }
 };
 var pull_request_updater_default = PullRequestUpdater;
