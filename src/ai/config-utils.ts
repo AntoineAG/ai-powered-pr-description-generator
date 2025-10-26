@@ -1,4 +1,4 @@
-import { AIHelperParams, GeminiConfig, OpenAIConfig, ProviderName, ProviderCommonConfig, RetryConfig } from './types';
+import { AIHelperParams, GeminiConfig, OpenAIConfig, ProviderCommonConfig, RetryConfig } from './types';
 
 export const DEFAULT_MAX_OUTPUT_TOKENS = 1536;
 export const MIN_MAX_OUTPUT_TOKENS = 768;

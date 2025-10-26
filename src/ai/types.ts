@@ -11,6 +11,8 @@ export interface AIHelperParams {
 
 // Minimal logger interface to keep helpers testable and provider-agnostic
 export interface Logger {
+  startGroup: (msg: string) => void,
+  endGroup: () => void,
   info: (msg: string) => void,
   warn: (msg: string) => void,
   error: (msg: string) => void,

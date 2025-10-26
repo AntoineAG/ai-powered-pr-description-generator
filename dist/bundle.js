@@ -19742,22 +19742,22 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       process.stdout.write(message + os.EOL);
     }
     exports2.info = info4;
-    function startGroup2(name) {
+    function startGroup3(name) {
       (0, command_1.issue)("group", name);
     }
-    exports2.startGroup = startGroup2;
-    function endGroup2() {
+    exports2.startGroup = startGroup3;
+    function endGroup3() {
       (0, command_1.issue)("endgroup");
     }
-    exports2.endGroup = endGroup2;
+    exports2.endGroup = endGroup3;
     function group(name, fn) {
       return __awaiter(this, void 0, void 0, function* () {
-        startGroup2(name);
+        startGroup3(name);
         let result;
         try {
           result = yield fn();
         } finally {
-          endGroup2();
+          endGroup3();
         }
         return result;
       });
@@ -23873,6 +23873,73 @@ var import_github = __toESM(require_github());
 // src/ai/ai-helper-resolver.ts
 var core = __toESM(require_core());
 
+// src/ai/config-utils.ts
+var DEFAULT_MAX_OUTPUT_TOKENS = 1536;
+var MIN_MAX_OUTPUT_TOKENS = 768;
+var DEFAULT_RETRY_CONFIG = {
+  maxAttempts: 8,
+  baseDelayMs: 1e3,
+  maxDelayMs: 3e4,
+  jitterMs: 250,
+  consecutive503ToSwitch: 10,
+  modelLadder: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-flash"]
+};
+function clampMaxOutputTokens(value) {
+  if (!Number.isFinite(value) || value <= 0) return DEFAULT_MAX_OUTPUT_TOKENS;
+  return Math.max(MIN_MAX_OUTPUT_TOKENS, Math.floor(value));
+}
+function readIntEnv(name, fallback) {
+  const raw = (process.env[name] || "").trim();
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+function buildRetryConfigFromEnv(base) {
+  return {
+    maxAttempts: readIntEnv("RETRY_MAX_ATTEMPTS", base?.maxAttempts) ?? DEFAULT_RETRY_CONFIG.maxAttempts,
+    baseDelayMs: readIntEnv("RETRY_BASE_DELAY_MS", base?.baseDelayMs) ?? DEFAULT_RETRY_CONFIG.baseDelayMs,
+    maxDelayMs: readIntEnv("RETRY_MAX_DELAY_MS", base?.maxDelayMs) ?? DEFAULT_RETRY_CONFIG.maxDelayMs,
+    jitterMs: readIntEnv("RETRY_JITTER_MS", base?.jitterMs) ?? DEFAULT_RETRY_CONFIG.jitterMs,
+    consecutive503ToSwitch: readIntEnv("RETRY_CONSEC_503_SWITCH", base?.consecutive503ToSwitch) ?? DEFAULT_RETRY_CONFIG.consecutive503ToSwitch,
+    modelLadder: base?.modelLadder ?? DEFAULT_RETRY_CONFIG.modelLadder
+  };
+}
+function buildProviderCommonConfig(params) {
+  const maxOutputTokensEnv = clampMaxOutputTokens(readIntEnv("MAX_OUTPUT_TOKENS", params.maxOutputTokens));
+  return {
+    model: params.model,
+    temperature: params.temperature,
+    maxOutputTokens: maxOutputTokensEnv,
+    systemText: params.systemText,
+    retry: buildRetryConfigFromEnv(params.retry)
+  };
+}
+function buildGeminiConfig(aiParams, options) {
+  const providerDefaults = {
+    model: (aiParams.model || "gemini-2.5-flash").trim(),
+    temperature: aiParams.temperature,
+    systemText: (options?.systemText || "You are very good at reviewing code and can generate pull request descriptions.").trim()
+  };
+  const common = buildProviderCommonConfig(providerDefaults);
+  return {
+    apiKey: aiParams.apiKey,
+    ...common
+  };
+}
+function buildOpenAIConfig(aiParams, options) {
+  const providerDefaults = {
+    model: (aiParams.model || "gpt-4.1").trim(),
+    temperature: aiParams.temperature,
+    systemText: (options?.systemText || "You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions.").trim()
+  };
+  const common = buildProviderCommonConfig({ ...providerDefaults, retry: { modelLadder: options?.modelLadder } });
+  return {
+    apiKey: aiParams.apiKey,
+    baseUrl: options?.baseUrl,
+    ...common
+  };
+}
+
 // node_modules/@google/generative-ai/dist/index.mjs
 var SchemaType;
 (function(SchemaType2) {
@@ -25049,12 +25116,13 @@ var GeminiAIHelper = class {
       const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
       const supportsSystem = this.supportsSystemInstruction(modelName);
       const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
-      this.logger.info(`[AI][Gemini] ::group::Request`);
+      this.logger.info(`[AI][Gemini]`);
+      this.logger.startGroup(`Request`);
       this.logger.info(`[AI][Gemini] model=${modelName} temperature=${temperature} maxOutputTokens=${maxOutputTokens}`);
       this.logger.info(`[AI][Gemini] promptLength=${prompt.length}`);
       this.logger.info(`[AI][Gemini] promptPreview:
 ${promptPreview}`);
-      this.logger.info(`::endgroup::`);
+      this.logger.endGroup();
       const userText = buildUserPromptText(systemText, prompt, supportsSystem);
       const payload = buildGenerateRequest({ userText, temperature, maxOutputTokens });
       const retryOutcome = await generateWithRetry(
@@ -25068,18 +25136,20 @@ ${promptPreview}`);
       let text = this.concatCandidatePartsText(response);
       const usage = response.usageMetadata || retryOutcome.value.usageMetadata || void 0;
       const finishReason = response.candidates?.[0]?.finishReason;
-      this.logger.info(`[AI][Gemini] ::group::Response`);
+      this.logger.info(`[AI][Gemini]`);
+      this.logger.startGroup(`Response`);
       this.logger.info(`[AI][Gemini] finishReason=${finishReason}`);
       this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
       this.logger.info(`[AI][Gemini] description:
 ${text}`);
-      this.logger.info(`::endgroup::`);
+      this.logger.endGroup();
       const diag = buildUsageDiagnostics(usage, text);
-      this.logger.info(`[AI][Gemini] ::group::Usage Diagnostics`);
+      this.logger.info(`[AI][Gemini]`);
+      this.logger.startGroup(`Usage Diagnostics`);
       this.logger.info(`[AI][Gemini] prompt=${diag.promptTokens} total=${diag.totalTokens} output=${Math.max(0, diag.totalTokens - diag.promptTokens)} candidates=${diag.candidateTokens}`);
       if (diag.inferenceNote) this.logger.info(`[AI][Gemini] notes=${diag.inferenceNote}`);
       this.logger.info(`[AI][Gemini] \u26A0\uFE0F ${Math.round(diag.thoughtsRatio * 100)}% internal reasoning, \u2705 ${Math.round(diag.visibleRatio * 100)}% visible output`);
-      this.logger.info(`::endgroup::`);
+      this.logger.endGroup();
       if (diag.totalTokens - diag.promptTokens === 0) {
         this.logger.warn("[AI][Gemini] No output tokens reported by API; consider increasing maxOutputTokens if finishReason=MAX_TOKENS.");
       } else if (diag.thoughtsRatio > 0.9) {
@@ -25258,78 +25328,13 @@ ${more}`);
 };
 var open_ai_helper_default = OpenAIHelper;
 
-// src/ai/config-utils.ts
-var DEFAULT_MAX_OUTPUT_TOKENS = 1536;
-var MIN_MAX_OUTPUT_TOKENS = 768;
-var DEFAULT_RETRY_CONFIG = {
-  maxAttempts: 8,
-  baseDelayMs: 1e3,
-  maxDelayMs: 3e4,
-  jitterMs: 250,
-  consecutive503ToSwitch: 10,
-  modelLadder: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-flash"]
-};
-function clampMaxOutputTokens(value) {
-  if (!Number.isFinite(value) || value <= 0) return DEFAULT_MAX_OUTPUT_TOKENS;
-  return Math.max(MIN_MAX_OUTPUT_TOKENS, Math.floor(value));
-}
-function readIntEnv(name, fallback) {
-  const raw = (process.env[name] || "").trim();
-  if (!raw) return fallback;
-  const n = Number.parseInt(raw, 10);
-  return Number.isFinite(n) ? n : fallback;
-}
-function buildRetryConfigFromEnv(base) {
-  return {
-    maxAttempts: readIntEnv("RETRY_MAX_ATTEMPTS", base?.maxAttempts) ?? DEFAULT_RETRY_CONFIG.maxAttempts,
-    baseDelayMs: readIntEnv("RETRY_BASE_DELAY_MS", base?.baseDelayMs) ?? DEFAULT_RETRY_CONFIG.baseDelayMs,
-    maxDelayMs: readIntEnv("RETRY_MAX_DELAY_MS", base?.maxDelayMs) ?? DEFAULT_RETRY_CONFIG.maxDelayMs,
-    jitterMs: readIntEnv("RETRY_JITTER_MS", base?.jitterMs) ?? DEFAULT_RETRY_CONFIG.jitterMs,
-    consecutive503ToSwitch: readIntEnv("RETRY_CONSEC_503_SWITCH", base?.consecutive503ToSwitch) ?? DEFAULT_RETRY_CONFIG.consecutive503ToSwitch,
-    modelLadder: base?.modelLadder ?? DEFAULT_RETRY_CONFIG.modelLadder
-  };
-}
-function buildProviderCommonConfig(params) {
-  const maxOutputTokensEnv = clampMaxOutputTokens(readIntEnv("MAX_OUTPUT_TOKENS", params.maxOutputTokens));
-  return {
-    model: params.model,
-    temperature: params.temperature,
-    maxOutputTokens: maxOutputTokensEnv,
-    systemText: params.systemText,
-    retry: buildRetryConfigFromEnv(params.retry)
-  };
-}
-function buildGeminiConfig(aiParams, options) {
-  const providerDefaults = {
-    model: (aiParams.model || "gemini-2.5-flash").trim(),
-    temperature: aiParams.temperature,
-    systemText: (options?.systemText || "You are very good at reviewing code and can generate pull request descriptions.").trim()
-  };
-  const common = buildProviderCommonConfig(providerDefaults);
-  return {
-    apiKey: aiParams.apiKey,
-    ...common
-  };
-}
-function buildOpenAIConfig(aiParams, options) {
-  const providerDefaults = {
-    model: (aiParams.model || "gpt-4.1").trim(),
-    temperature: aiParams.temperature,
-    systemText: (options?.systemText || "You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions.").trim()
-  };
-  const common = buildProviderCommonConfig({ ...providerDefaults, retry: { modelLadder: options?.modelLadder } });
-  return {
-    apiKey: aiParams.apiKey,
-    baseUrl: options?.baseUrl,
-    ...common
-  };
-}
-
 // src/ai/ai-helper-resolver.ts
 var aiHelperResolver = (aiHelperParams) => {
   const { aiName, model, temperature } = aiHelperParams;
   core.info(`[AI] Resolver -> provider=${aiName}, model=${model}, temperature=${temperature}`);
   const logger = {
+    startGroup: (msg) => core.startGroup(msg),
+    endGroup: () => core.endGroup(),
     info: (msg) => core.info(msg),
     warn: (msg) => core.warning(msg),
     error: (msg) => core.error(msg),

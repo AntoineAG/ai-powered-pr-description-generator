@@ -1,14 +1,16 @@
 import * as core from '@actions/core';
+import { buildGeminiConfig, buildOpenAIConfig } from './config-utils';
 import GeminiAIHelper from './gemini-ai-helper';
 import OpenAIHelper from './open-ai-helper';
 import { AIHelperInterface, AIHelperParams, Logger } from './types';
-import { buildGeminiConfig, buildOpenAIConfig } from './config-utils';
 
 const aiHelperResolver = (aiHelperParams: AIHelperParams): AIHelperInterface => {
   const { aiName, model, temperature } = aiHelperParams;
   core.info(`[AI] Resolver -> provider=${aiName}, model=${model}, temperature=${temperature}`);
 
   const logger: Logger = {
+    startGroup: (msg: string) => core.startGroup(msg),
+    endGroup: () => core.endGroup(),
     info: (msg: string) => core.info(msg),
     warn: (msg: string) => core.warning(msg),
     error: (msg: string) => core.error(msg),

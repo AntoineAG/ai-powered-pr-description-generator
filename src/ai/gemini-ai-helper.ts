@@ -1,4 +1,4 @@
-git import { EnhancedGenerateContentResponse, FinishReason, GenerateContentRequest, GenerateContentResult, GenerativeModel, GoogleGenerativeAI, UsageMetadata } from '@google/generative-ai';
+import { EnhancedGenerateContentResponse, FinishReason, GenerateContentRequest, GenerateContentResult, GenerativeModel, GoogleGenerativeAI, UsageMetadata } from '@google/generative-ai';
 import { AIError } from './ai-error';
 import { ModelCache } from './model-cache';
 import { buildContinuationParts, buildGenerateRequest, buildUserPromptText, previewText, PROMPT_PREVIEW_LIMIT } from './prompt-utils';
@@ -31,11 +31,12 @@ class GeminiAIHelper implements AIHelperInterface {
       const supportsSystem = this.supportsSystemInstruction(modelName);
       const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
 
-      this.logger.info(`[AI][Gemini] ::group::Request`);
+      this.logger.info(`[AI][Gemini]`);
+      this.logger.startGroup(`Request`);
       this.logger.info(`[AI][Gemini] model=${modelName} temperature=${temperature} maxOutputTokens=${maxOutputTokens}`);
       this.logger.info(`[AI][Gemini] promptLength=${prompt.length}`);
       this.logger.info(`[AI][Gemini] promptPreview:\n${promptPreview}`);
-      this.logger.info(`::endgroup::`);
+      this.logger.endGroup();
 
       const userText = buildUserPromptText(systemText, prompt, supportsSystem);
       const payload = buildGenerateRequest({ userText, temperature, maxOutputTokens });
@@ -53,18 +54,20 @@ class GeminiAIHelper implements AIHelperInterface {
       const usage: UsageMetadata | undefined = response.usageMetadata || (retryOutcome.value as any).usageMetadata || undefined;
       const finishReason: FinishReason | undefined = response.candidates?.[0]?.finishReason;
 
-      this.logger.info(`[AI][Gemini] ::group::Response`);
+      this.logger.info(`[AI][Gemini]`);
+      this.logger.startGroup(`Response`);
       this.logger.info(`[AI][Gemini] finishReason=${finishReason}`);
       this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
       this.logger.info(`[AI][Gemini] description:\n${text}`);
-      this.logger.info(`::endgroup::`);
+      this.logger.endGroup();
 
       const diag = buildUsageDiagnostics(usage, text);
-      this.logger.info(`[AI][Gemini] ::group::Usage Diagnostics`);
+      this.logger.info(`[AI][Gemini]`);
+      this.logger.startGroup(`Usage Diagnostics`);
       this.logger.info(`[AI][Gemini] prompt=${diag.promptTokens} total=${diag.totalTokens} output=${Math.max(0, diag.totalTokens - diag.promptTokens)} candidates=${diag.candidateTokens}`);
       if (diag.inferenceNote) this.logger.info(`[AI][Gemini] notes=${diag.inferenceNote}`);
       this.logger.info(`[AI][Gemini] ⚠️ ${Math.round(diag.thoughtsRatio * 100)}% internal reasoning, ✅ ${Math.round(diag.visibleRatio * 100)}% visible output`);
-      this.logger.info(`::endgroup::`);
+      this.logger.endGroup();
       if (diag.totalTokens - diag.promptTokens === 0) {
         this.logger.warn('[AI][Gemini] No output tokens reported by API; consider increasing maxOutputTokens if finishReason=MAX_TOKENS.');
       } else if (diag.thoughtsRatio > 0.9) {
