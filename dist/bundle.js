@@ -1,3 +1,4 @@
+"use strict";
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -417,18 +418,18 @@ var require_tunnel = __commonJS({
             res.statusCode
           );
           socket.destroy();
-          var error4 = new Error("tunneling socket could not be established, statusCode=" + res.statusCode);
-          error4.code = "ECONNRESET";
-          options.request.emit("error", error4);
+          var error3 = new Error("tunneling socket could not be established, statusCode=" + res.statusCode);
+          error3.code = "ECONNRESET";
+          options.request.emit("error", error3);
           self.removeSocket(placeholder);
           return;
         }
         if (head.length > 0) {
           debug("got illegal response body from proxy");
           socket.destroy();
-          var error4 = new Error("got illegal response body from proxy");
-          error4.code = "ECONNRESET";
-          options.request.emit("error", error4);
+          var error3 = new Error("got illegal response body from proxy");
+          error3.code = "ECONNRESET";
+          options.request.emit("error", error3);
           self.removeSocket(placeholder);
           return;
         }
@@ -443,9 +444,9 @@ var require_tunnel = __commonJS({
           cause.message,
           cause.stack
         );
-        var error4 = new Error("tunneling socket could not be established, cause=" + cause.message);
-        error4.code = "ECONNRESET";
-        options.request.emit("error", error4);
+        var error3 = new Error("tunneling socket could not be established, cause=" + cause.message);
+        error3.code = "ECONNRESET";
+        options.request.emit("error", error3);
         self.removeSocket(placeholder);
       }
     };
@@ -5566,7 +5567,7 @@ Content-Type: ${value.type || "application/octet-stream"}\r
         throw new TypeError("Body is unusable");
       }
       const promise = createDeferredPromise();
-      const errorSteps = (error4) => promise.reject(error4);
+      const errorSteps = (error3) => promise.reject(error3);
       const successSteps = (data) => {
         try {
           promise.resolve(convertBytesToJSValue(data));
@@ -5852,16 +5853,16 @@ var require_request = __commonJS({
           this.onError(err);
         }
       }
-      onError(error4) {
+      onError(error3) {
         this.onFinally();
         if (channels.error.hasSubscribers) {
-          channels.error.publish({ request: this, error: error4 });
+          channels.error.publish({ request: this, error: error3 });
         }
         if (this.aborted) {
           return;
         }
         this.aborted = true;
-        return this[kHandler].onError(error4);
+        return this[kHandler].onError(error3);
       }
       onFinally() {
         if (this.errorHandler) {
@@ -6724,8 +6725,8 @@ var require_RedirectHandler = __commonJS({
       onUpgrade(statusCode, headers, socket) {
         this.handler.onUpgrade(statusCode, headers, socket);
       }
-      onError(error4) {
-        this.handler.onError(error4);
+      onError(error3) {
+        this.handler.onError(error3);
       }
       onHeaders(statusCode, headers, resume, statusText) {
         this.location = this.history.length >= this.maxRedirections || util.isDisturbed(this.opts.body) ? null : parseLocation(statusCode, headers);
@@ -10467,13 +10468,13 @@ var require_mock_utils = __commonJS({
       if (mockDispatch2.data.callback) {
         mockDispatch2.data = { ...mockDispatch2.data, ...mockDispatch2.data.callback(opts) };
       }
-      const { data: { statusCode, data, headers, trailers, error: error4 }, delay, persist } = mockDispatch2;
+      const { data: { statusCode, data, headers, trailers, error: error3 }, delay, persist } = mockDispatch2;
       const { timesInvoked, times } = mockDispatch2;
       mockDispatch2.consumed = !persist && timesInvoked >= times;
       mockDispatch2.pending = timesInvoked < times;
-      if (error4 !== null) {
+      if (error3 !== null) {
         deleteMockDispatch(this[kDispatches], key);
-        handler.onError(error4);
+        handler.onError(error3);
         return true;
       }
       if (typeof delay === "number" && delay > 0) {
@@ -10511,19 +10512,19 @@ var require_mock_utils = __commonJS({
         if (agent.isMockActive) {
           try {
             mockDispatch.call(this, opts, handler);
-          } catch (error4) {
-            if (error4 instanceof MockNotMatchedError) {
+          } catch (error3) {
+            if (error3 instanceof MockNotMatchedError) {
               const netConnect = agent[kGetNetConnect]();
               if (netConnect === false) {
-                throw new MockNotMatchedError(`${error4.message}: subsequent request to origin ${origin} was not allowed (net.connect disabled)`);
+                throw new MockNotMatchedError(`${error3.message}: subsequent request to origin ${origin} was not allowed (net.connect disabled)`);
               }
               if (checkNetConnect(netConnect, origin)) {
                 originalDispatch.call(this, opts, handler);
               } else {
-                throw new MockNotMatchedError(`${error4.message}: subsequent request to origin ${origin} was not allowed (net.connect is not enabled for this origin)`);
+                throw new MockNotMatchedError(`${error3.message}: subsequent request to origin ${origin} was not allowed (net.connect is not enabled for this origin)`);
               }
             } else {
-              throw error4;
+              throw error3;
             }
           }
         } else {
@@ -10686,11 +10687,11 @@ var require_mock_interceptor = __commonJS({
       /**
        * Mock an undici request with a defined error.
        */
-      replyWithError(error4) {
-        if (typeof error4 === "undefined") {
+      replyWithError(error3) {
+        if (typeof error3 === "undefined") {
           throw new InvalidArgumentError("error must be defined");
         }
-        const newMockDispatch = addMockDispatch(this[kDispatches], this[kDispatchKey], { error: error4 });
+        const newMockDispatch = addMockDispatch(this[kDispatches], this[kDispatchKey], { error: error3 });
         return new MockScope(newMockDispatch);
       }
       /**
@@ -13013,17 +13014,17 @@ var require_fetch = __commonJS({
         this.emit("terminated", reason);
       }
       // https://fetch.spec.whatwg.org/#fetch-controller-abort
-      abort(error4) {
+      abort(error3) {
         if (this.state !== "ongoing") {
           return;
         }
         this.state = "aborted";
-        if (!error4) {
-          error4 = new DOMException2("The operation was aborted.", "AbortError");
+        if (!error3) {
+          error3 = new DOMException2("The operation was aborted.", "AbortError");
         }
-        this.serializedAbortReason = error4;
-        this.connection?.destroy(error4);
-        this.emit("terminated", error4);
+        this.serializedAbortReason = error3;
+        this.connection?.destroy(error3);
+        this.emit("terminated", error3);
       }
     };
     function fetch2(input, init = {}) {
@@ -13127,13 +13128,13 @@ var require_fetch = __commonJS({
         performance.markResourceTiming(timingInfo, originalURL.href, initiatorType, globalThis2, cacheState);
       }
     }
-    function abortFetch(p, request, responseObject, error4) {
-      if (!error4) {
-        error4 = new DOMException2("The operation was aborted.", "AbortError");
+    function abortFetch(p, request, responseObject, error3) {
+      if (!error3) {
+        error3 = new DOMException2("The operation was aborted.", "AbortError");
       }
-      p.reject(error4);
+      p.reject(error3);
       if (request.body != null && isReadable(request.body?.stream)) {
-        request.body.stream.cancel(error4).catch((err) => {
+        request.body.stream.cancel(error3).catch((err) => {
           if (err.code === "ERR_INVALID_STATE") {
             return;
           }
@@ -13145,7 +13146,7 @@ var require_fetch = __commonJS({
       }
       const response = responseObject[kState];
       if (response.body != null && isReadable(response.body?.stream)) {
-        response.body.stream.cancel(error4).catch((err) => {
+        response.body.stream.cancel(error3).catch((err) => {
           if (err.code === "ERR_INVALID_STATE") {
             return;
           }
@@ -13925,13 +13926,13 @@ var require_fetch = __commonJS({
               fetchParams.controller.ended = true;
               this.body.push(null);
             },
-            onError(error4) {
+            onError(error3) {
               if (this.abort) {
                 fetchParams.controller.off("terminated", this.abort);
               }
-              this.body?.destroy(error4);
-              fetchParams.controller.terminate(error4);
-              reject(error4);
+              this.body?.destroy(error3);
+              fetchParams.controller.terminate(error3);
+              reject(error3);
             },
             onUpgrade(status, headersList, socket) {
               if (status !== 101) {
@@ -14397,8 +14398,8 @@ var require_util4 = __commonJS({
                   }
                   fr[kResult] = result;
                   fireAProgressEvent("load", fr);
-                } catch (error4) {
-                  fr[kError] = error4;
+                } catch (error3) {
+                  fr[kError] = error3;
                   fireAProgressEvent("error", fr);
                 }
                 if (fr[kState] !== "loading") {
@@ -14407,13 +14408,13 @@ var require_util4 = __commonJS({
               });
               break;
             }
-          } catch (error4) {
+          } catch (error3) {
             if (fr[kAborted]) {
               return;
             }
             queueMicrotask(() => {
               fr[kState] = "done";
-              fr[kError] = error4;
+              fr[kError] = error3;
               fireAProgressEvent("error", fr);
               if (fr[kState] !== "loading") {
                 fireAProgressEvent("loadend", fr);
@@ -16427,11 +16428,11 @@ var require_connection = __commonJS({
         });
       }
     }
-    function onSocketError(error4) {
+    function onSocketError(error3) {
       const { ws } = this;
       ws[kReadyState] = states.CLOSING;
       if (channels.socketError.hasSubscribers) {
-        channels.socketError.publish(error4);
+        channels.socketError.publish(error3);
       }
       this.destroy();
     }
@@ -17575,12 +17576,12 @@ var require_lib = __commonJS({
             throw new Error("Client has already been disposed.");
           }
           const parsedUrl = new URL(requestUrl);
-          let info5 = this._prepareRequest(verb, parsedUrl, headers);
+          let info4 = this._prepareRequest(verb, parsedUrl, headers);
           const maxTries = this._allowRetries && RetryableHttpVerbs.includes(verb) ? this._maxRetries + 1 : 1;
           let numTries = 0;
           let response;
           do {
-            response = yield this.requestRaw(info5, data);
+            response = yield this.requestRaw(info4, data);
             if (response && response.message && response.message.statusCode === HttpCodes.Unauthorized) {
               let authenticationHandler;
               for (const handler of this.handlers) {
@@ -17590,7 +17591,7 @@ var require_lib = __commonJS({
                 }
               }
               if (authenticationHandler) {
-                return authenticationHandler.handleAuthentication(this, info5, data);
+                return authenticationHandler.handleAuthentication(this, info4, data);
               } else {
                 return response;
               }
@@ -17613,8 +17614,8 @@ var require_lib = __commonJS({
                   }
                 }
               }
-              info5 = this._prepareRequest(verb, parsedRedirectUrl, headers);
-              response = yield this.requestRaw(info5, data);
+              info4 = this._prepareRequest(verb, parsedRedirectUrl, headers);
+              response = yield this.requestRaw(info4, data);
               redirectsRemaining--;
             }
             if (!response.message.statusCode || !HttpResponseRetryCodes.includes(response.message.statusCode)) {
@@ -17643,7 +17644,7 @@ var require_lib = __commonJS({
        * @param info
        * @param data
        */
-      requestRaw(info5, data) {
+      requestRaw(info4, data) {
         return __awaiter(this, void 0, void 0, function* () {
           return new Promise((resolve, reject) => {
             function callbackForResult(err, res) {
@@ -17655,7 +17656,7 @@ var require_lib = __commonJS({
                 resolve(res);
               }
             }
-            this.requestRawWithCallback(info5, data, callbackForResult);
+            this.requestRawWithCallback(info4, data, callbackForResult);
           });
         });
       }
@@ -17665,12 +17666,12 @@ var require_lib = __commonJS({
        * @param data
        * @param onResult
        */
-      requestRawWithCallback(info5, data, onResult) {
+      requestRawWithCallback(info4, data, onResult) {
         if (typeof data === "string") {
-          if (!info5.options.headers) {
-            info5.options.headers = {};
+          if (!info4.options.headers) {
+            info4.options.headers = {};
           }
-          info5.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
+          info4.options.headers["Content-Length"] = Buffer.byteLength(data, "utf8");
         }
         let callbackCalled = false;
         function handleResult(err, res) {
@@ -17679,7 +17680,7 @@ var require_lib = __commonJS({
             onResult(err, res);
           }
         }
-        const req = info5.httpModule.request(info5.options, (msg) => {
+        const req = info4.httpModule.request(info4.options, (msg) => {
           const res = new HttpClientResponse(msg);
           handleResult(void 0, res);
         });
@@ -17691,7 +17692,7 @@ var require_lib = __commonJS({
           if (socket) {
             socket.end();
           }
-          handleResult(new Error(`Request timeout: ${info5.options.path}`));
+          handleResult(new Error(`Request timeout: ${info4.options.path}`));
         });
         req.on("error", function(err) {
           handleResult(err);
@@ -17727,27 +17728,27 @@ var require_lib = __commonJS({
         return this._getProxyAgentDispatcher(parsedUrl, proxyUrl);
       }
       _prepareRequest(method, requestUrl, headers) {
-        const info5 = {};
-        info5.parsedUrl = requestUrl;
-        const usingSsl = info5.parsedUrl.protocol === "https:";
-        info5.httpModule = usingSsl ? https : http;
+        const info4 = {};
+        info4.parsedUrl = requestUrl;
+        const usingSsl = info4.parsedUrl.protocol === "https:";
+        info4.httpModule = usingSsl ? https : http;
         const defaultPort = usingSsl ? 443 : 80;
-        info5.options = {};
-        info5.options.host = info5.parsedUrl.hostname;
-        info5.options.port = info5.parsedUrl.port ? parseInt(info5.parsedUrl.port) : defaultPort;
-        info5.options.path = (info5.parsedUrl.pathname || "") + (info5.parsedUrl.search || "");
-        info5.options.method = method;
-        info5.options.headers = this._mergeHeaders(headers);
+        info4.options = {};
+        info4.options.host = info4.parsedUrl.hostname;
+        info4.options.port = info4.parsedUrl.port ? parseInt(info4.parsedUrl.port) : defaultPort;
+        info4.options.path = (info4.parsedUrl.pathname || "") + (info4.parsedUrl.search || "");
+        info4.options.method = method;
+        info4.options.headers = this._mergeHeaders(headers);
         if (this.userAgent != null) {
-          info5.options.headers["user-agent"] = this.userAgent;
+          info4.options.headers["user-agent"] = this.userAgent;
         }
-        info5.options.agent = this._getAgent(info5.parsedUrl);
+        info4.options.agent = this._getAgent(info4.parsedUrl);
         if (this.handlers) {
           for (const handler of this.handlers) {
-            handler.prepareRequest(info5.options);
+            handler.prepareRequest(info4.options);
           }
         }
-        return info5;
+        return info4;
       }
       _mergeHeaders(headers) {
         if (this.requestOptions && this.requestOptions.headers) {
@@ -18063,12 +18064,12 @@ var require_oidc_utils = __commonJS({
         var _a;
         return __awaiter(this, void 0, void 0, function* () {
           const httpclient = _OidcClient.createHttpClient();
-          const res = yield httpclient.getJson(id_token_url).catch((error4) => {
+          const res = yield httpclient.getJson(id_token_url).catch((error3) => {
             throw new Error(`Failed to get ID Token. 
  
-        Error Code : ${error4.statusCode}
+        Error Code : ${error3.statusCode}
  
-        Error Message: ${error4.message}`);
+        Error Message: ${error3.message}`);
           });
           const id_token = (_a = res.result) === null || _a === void 0 ? void 0 : _a.value;
           if (!id_token) {
@@ -18089,8 +18090,8 @@ var require_oidc_utils = __commonJS({
             const id_token = yield _OidcClient.getCall(id_token_url);
             (0, core_1.setSecret)(id_token);
             return id_token;
-          } catch (error4) {
-            throw new Error(`Error message: ${error4.message}`);
+          } catch (error3) {
+            throw new Error(`Error message: ${error3.message}`);
           }
         });
       }
@@ -19212,7 +19213,7 @@ var require_toolrunner = __commonJS({
               this._debug(`STDIO streams have closed for tool '${this.toolPath}'`);
               state.CheckComplete();
             });
-            state.on("done", (error4, exitCode) => {
+            state.on("done", (error3, exitCode) => {
               if (stdbuffer.length > 0) {
                 this.emit("stdline", stdbuffer);
               }
@@ -19220,8 +19221,8 @@ var require_toolrunner = __commonJS({
                 this.emit("errline", errbuffer);
               }
               cp.removeAllListeners();
-              if (error4) {
-                reject(error4);
+              if (error3) {
+                reject(error3);
               } else {
                 resolve(exitCode);
               }
@@ -19316,14 +19317,14 @@ var require_toolrunner = __commonJS({
         this.emit("debug", message);
       }
       _setResult() {
-        let error4;
+        let error3;
         if (this.processExited) {
           if (this.processError) {
-            error4 = new Error(`There was an error when attempting to execute the process '${this.toolPath}'. This may indicate the process failed to start. Error: ${this.processError}`);
+            error3 = new Error(`There was an error when attempting to execute the process '${this.toolPath}'. This may indicate the process failed to start. Error: ${this.processError}`);
           } else if (this.processExitCode !== 0 && !this.options.ignoreReturnCode) {
-            error4 = new Error(`The process '${this.toolPath}' failed with exit code ${this.processExitCode}`);
+            error3 = new Error(`The process '${this.toolPath}' failed with exit code ${this.processExitCode}`);
           } else if (this.processStderr && this.options.failOnStdErr) {
-            error4 = new Error(`The process '${this.toolPath}' failed because one or more lines were written to the STDERR stream`);
+            error3 = new Error(`The process '${this.toolPath}' failed because one or more lines were written to the STDERR stream`);
           }
         }
         if (this.timeout) {
@@ -19331,7 +19332,7 @@ var require_toolrunner = __commonJS({
           this.timeout = null;
         }
         this.done = true;
-        this.emit("done", error4, this.processExitCode);
+        this.emit("done", error3, this.processExitCode);
       }
       static HandleTimeout(state) {
         if (state.done) {
@@ -19714,7 +19715,7 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
     exports2.setCommandEcho = setCommandEcho;
     function setFailed3(message) {
       process.exitCode = ExitCode.Failure;
-      error4(message);
+      error3(message);
     }
     exports2.setFailed = setFailed3;
     function isDebug() {
@@ -19725,38 +19726,38 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("debug", {}, message);
     }
     exports2.debug = debug;
-    function error4(message, properties = {}) {
+    function error3(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.error = error4;
-    function warning3(message, properties = {}) {
+    exports2.error = error3;
+    function warning2(message, properties = {}) {
       (0, command_1.issueCommand)("warning", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.warning = warning3;
+    exports2.warning = warning2;
     function notice(message, properties = {}) {
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.notice = notice;
-    function info5(message) {
+    function info4(message) {
       process.stdout.write(message + os.EOL);
     }
-    exports2.info = info5;
-    function startGroup3(name) {
+    exports2.info = info4;
+    function startGroup2(name) {
       (0, command_1.issue)("group", name);
     }
-    exports2.startGroup = startGroup3;
-    function endGroup3() {
+    exports2.startGroup = startGroup2;
+    function endGroup2() {
       (0, command_1.issue)("endgroup");
     }
-    exports2.endGroup = endGroup3;
+    exports2.endGroup = endGroup2;
     function group(name, fn) {
       return __awaiter(this, void 0, void 0, function* () {
-        startGroup3(name);
+        startGroup2(name);
         let result;
         try {
           result = yield fn();
         } finally {
-          endGroup3();
+          endGroup2();
         }
         return result;
       });
@@ -20029,8 +20030,8 @@ var require_add = __commonJS({
       }
       if (kind === "error") {
         hook = function(method, options) {
-          return Promise.resolve().then(method.bind(null, options)).catch(function(error4) {
-            return orig(error4, options);
+          return Promise.resolve().then(method.bind(null, options)).catch(function(error3) {
+            return orig(error3, options);
           });
         };
       }
@@ -20762,7 +20763,7 @@ var require_dist_node5 = __commonJS({
         }
         if (status >= 400) {
           const data = await getResponseData(response);
-          const error4 = new import_request_error.RequestError(toErrorMessage(data), status, {
+          const error3 = new import_request_error.RequestError(toErrorMessage(data), status, {
             response: {
               url,
               status,
@@ -20771,7 +20772,7 @@ var require_dist_node5 = __commonJS({
             },
             request: requestOptions
           });
-          throw error4;
+          throw error3;
         }
         return parseSuccessResponseBody ? await getResponseData(response) : response.body;
       }).then((data) => {
@@ -20781,17 +20782,17 @@ var require_dist_node5 = __commonJS({
           headers,
           data
         };
-      }).catch((error4) => {
-        if (error4 instanceof import_request_error.RequestError)
-          throw error4;
-        else if (error4.name === "AbortError")
-          throw error4;
-        let message = error4.message;
-        if (error4.name === "TypeError" && "cause" in error4) {
-          if (error4.cause instanceof Error) {
-            message = error4.cause.message;
-          } else if (typeof error4.cause === "string") {
-            message = error4.cause;
+      }).catch((error3) => {
+        if (error3 instanceof import_request_error.RequestError)
+          throw error3;
+        else if (error3.name === "AbortError")
+          throw error3;
+        let message = error3.message;
+        if (error3.name === "TypeError" && "cause" in error3) {
+          if (error3.cause instanceof Error) {
+            message = error3.cause.message;
+          } else if (typeof error3.cause === "string") {
+            message = error3.cause;
           }
         }
         throw new import_request_error.RequestError(message, 500, {
@@ -23457,9 +23458,9 @@ var require_dist_node10 = __commonJS({
                 /<([^>]+)>;\s*rel="next"/
               ) || [])[1];
               return { value: normalizedResponse };
-            } catch (error4) {
-              if (error4.status !== 409)
-                throw error4;
+            } catch (error3) {
+              if (error3.status !== 409)
+                throw error3;
               url = "";
               return {
                 value: {
@@ -23865,12 +23866,12 @@ var require_github = __commonJS({
 });
 
 // src/pull-request-updater.ts
-var core4 = __toESM(require_core());
+var core3 = __toESM(require_core());
 var import_core = __toESM(require_core());
 var import_github = __toESM(require_github());
 
 // src/ai/ai-helper-resolver.ts
-var core2 = __toESM(require_core());
+var core = __toESM(require_core());
 
 // node_modules/@google/generative-ai/dist/index.mjs
 var SchemaType;
@@ -24879,63 +24880,217 @@ var GoogleGenerativeAI = class {
   }
 };
 
+// src/ai/ai-error.ts
+var AIError = class _AIError extends Error {
+  constructor(message, meta, cause) {
+    super(message);
+    this.name = "AIError";
+    this.meta = meta;
+    this.causeErr = cause;
+  }
+  static wrap(message, meta, cause) {
+    return new _AIError(message, meta, cause);
+  }
+};
+
+// src/ai/model-cache.ts
+var ModelCache = class {
+  constructor(builder) {
+    this.builder = builder;
+    this.map = /* @__PURE__ */ new Map();
+  }
+  getOrBuild(name) {
+    const existing = this.map.get(name);
+    if (existing) return existing;
+    const built = this.builder(name);
+    this.map.set(name, built);
+    return built;
+  }
+};
+
+// src/ai/prompt-utils.ts
+var PROMPT_PREVIEW_LIMIT = 2e3;
+function previewText(text, limit = PROMPT_PREVIEW_LIMIT) {
+  if (!text) return "";
+  return text.length > limit ? `${text.slice(0, limit)}[...]` : text;
+}
+function buildUserPromptText(systemText, prompt, supportsSystemInstruction) {
+  return supportsSystemInstruction ? prompt : `${systemText}
+
+${prompt}`;
+}
+function buildContinuationParts(previousOutput, prompt) {
+  return [
+    { role: "user", parts: [{ text: prompt }] },
+    { role: "model", parts: [{ text: previousOutput }] },
+    { role: "user", parts: [{ text: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }] }
+  ];
+}
+function buildGenerateRequest(params) {
+  return {
+    contents: [{ role: "user", parts: [{ text: params.userText }] }],
+    generationConfig: { temperature: params.temperature, maxOutputTokens: params.maxOutputTokens }
+  };
+}
+
+// src/ai/retry-utils.ts
+var defaultRetryClassifier = {
+  isRetryable: (e) => {
+    const status = typeof e?.status === "number" ? e.status : void 0;
+    const msg = e?.message ? String(e.message) : String(e);
+    return status === 429 || status === 503 || /\b(429|503)\b/.test(msg) || /temporar(il)?y|unavailable|overload/i.test(msg);
+  },
+  isOverloaded: (e) => {
+    const status = typeof e?.status === "number" ? e.status : void 0;
+    const msg = e?.message ? String(e.message) : String(e);
+    return status === 503 || /\b503\b/.test(msg) || /unavailable|overload/i.test(msg);
+  },
+  status: (e) => typeof e?.status === "number" ? e.status : void 0,
+  message: (e) => e?.message ? String(e.message) : String(e)
+};
+async function generateWithRetry(task, options, classifier = defaultRetryClassifier) {
+  const { logger, provider, retry } = options;
+  const ladder = [options.initialModel, ...(retry.modelLadder || []).filter((m) => m !== options.initialModel)];
+  let currentIdx = 0;
+  let currentModel = ladder[currentIdx];
+  let consecutive503 = 0;
+  const started = Date.now();
+  for (let attempt = 1; attempt <= retry.maxAttempts; attempt++) {
+    const delay = Math.min(retry.baseDelayMs * Math.pow(2, attempt - 1), retry.maxDelayMs) + Math.floor(Math.random() * retry.jitterMs);
+    logger.info(`[AI][${provider}] \u{1F501} Attempt ${attempt} model=${currentModel}`);
+    try {
+      const value = await task(currentModel);
+      const elapsed2 = Date.now() - started;
+      logger.info(`[AI][${provider}] \u2705 success attempt=${attempt} model=${currentModel} elapsedMs=${elapsed2}`);
+      return { value, modelUsed: currentModel, attempts: attempt, elapsedMs: elapsed2 };
+    } catch (err) {
+      const status = classifier.status(err);
+      const msg = classifier.message(err);
+      const overloaded = classifier.isOverloaded(err);
+      const retryable = classifier.isRetryable(err);
+      if (overloaded) consecutive503++;
+      else consecutive503 = 0;
+      if (retryable) {
+        if (overloaded && retry.consecutive503ToSwitch && consecutive503 >= retry.consecutive503ToSwitch && currentIdx < ladder.length - 1) {
+          const next = ladder[++currentIdx];
+          logger.warn(`[AI][${provider}] \u26A0\uFE0F persistent 503; switching model ${currentModel} -> ${next}`);
+          currentModel = next;
+        }
+        logger.warn(`[AI][${provider}] \u26A0\uFE0F retryable error status=${status ?? "n/a"} message=${msg}`);
+        logger.warn(`[AI][${provider}] \u{1F501} will retry attempt=${attempt + 1} in ${delay}ms`);
+        if (attempt >= retry.maxAttempts) throw err;
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      logger.error(`[AI][${provider}] \u274C non-retryable error attempt=${attempt} status=${status ?? "n/a"} message=${msg}`);
+      throw err;
+    }
+  }
+  const elapsed = Date.now() - started;
+  throw new Error(`[AI][${provider}] Exhausted retry attempts after ${elapsed}ms`);
+}
+
+// src/ai/usage-diagnostics.ts
+function buildUsageDiagnostics(usage, text) {
+  const num = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
+  const u = usage || {};
+  const prompt = num(u.promptTokenCount);
+  const candidates = num(u.candidatesTokenCount);
+  const total = num(u.totalTokenCount);
+  const outputTotal = Math.max(0, total - prompt);
+  const approxVisibleRaw = Math.max(0, Math.ceil((text || "").length / 4));
+  const visibleApprox = Math.min(approxVisibleRaw, outputTotal);
+  let thoughts = 0;
+  let inferenceNote = null;
+  const thoughtsReported = num(u.thoughtsTokenCount);
+  if (thoughtsReported > 0) {
+    thoughts = Math.min(thoughtsReported, outputTotal);
+  } else if (candidates > 0) {
+    thoughts = Math.max(0, Math.min(candidates - visibleApprox, outputTotal));
+    inferenceNote = "estimated from candidates \u2212 visible";
+  } else {
+    thoughts = Math.max(0, outputTotal - visibleApprox);
+    if (outputTotal > 0) {
+      inferenceNote = "inferred from (total \u2212 prompt) \u2212 visible";
+    }
+  }
+  const denom = Math.max(1, outputTotal);
+  const thoughtsRatio = thoughts / denom;
+  const visibleRatio = Math.max(0, 1 - thoughtsRatio);
+  return {
+    promptTokens: prompt,
+    candidateTokens: candidates,
+    totalTokens: total,
+    visibleTokensApprox: visibleApprox,
+    thoughtsTokens: thoughts,
+    thoughtsRatio,
+    visibleRatio,
+    inferenceNote
+  };
+}
+
 // src/ai/gemini-ai-helper.ts
 var GeminiAIHelper = class {
-  config;
-  logger;
-  currentModelName = null;
-  currentModel = null;
   constructor(params) {
     this.config = params.config;
     this.logger = params.logger;
+    const client = new GoogleGenerativeAI(this.config.apiKey);
+    this.cache = new ModelCache((name) => {
+      const supportsSystem = this.supportsSystemInstruction(name);
+      const modelParams = {
+        model: name,
+        ...supportsSystem ? { systemInstruction: this.config.systemText } : {}
+      };
+      return client.getGenerativeModel(modelParams);
+    });
   }
   async createPullRequestDescription(_diffOutput, prompt) {
     try {
-      const { model: modelName, temperature, maxOutputTokens: initialMaxOutputTokens, systemText } = this.config;
-      const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
-      this.logger.info(`
-[AI][Gemini] Request model=${modelName} temperature=${temperature} maxOutputTokens=${initialMaxOutputTokens}`);
+      const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
+      const supportsSystem = this.supportsSystemInstruction(modelName);
+      const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
+      this.logger.info(`[AI][Gemini] ::group::Request`);
+      this.logger.info(`[AI][Gemini] model=${modelName} temperature=${temperature} maxOutputTokens=${maxOutputTokens}`);
       this.logger.info(`[AI][Gemini] promptLength=${prompt.length}`);
       this.logger.info(`[AI][Gemini] promptPreview:
-${promptPreview}
-`);
-      const payload = {
-        contents: [
-          { role: "user", parts: [{ text: !this.supportsSystemInstruction(modelName) ? `${systemText}
-
-${prompt}` : prompt }] }
-        ],
-        generationConfig: {
-          temperature,
-          maxOutputTokens: initialMaxOutputTokens
-        }
-      };
-      const { result, modelUsed } = await this.generateWithRetry(payload, modelName);
-      const response = result.response;
-      const textFromParts = this.concatCandidatePartsText(response);
-      let text = textFromParts;
-      const usage = response.usageMetadata || result.usageMetadata || void 0;
+${promptPreview}`);
+      this.logger.info(`::endgroup::`);
+      const userText = buildUserPromptText(systemText, prompt, supportsSystem);
+      const payload = buildGenerateRequest({ userText, temperature, maxOutputTokens });
+      const retryOutcome = await generateWithRetry(
+        async (activeModelName) => {
+          const model = this.cache.getOrBuild(activeModelName);
+          return model.generateContent(payload);
+        },
+        { logger: this.logger, provider: "Gemini", initialModel: modelName, retry: this.config.retry }
+      );
+      const response = retryOutcome.value.response;
+      let text = this.concatCandidatePartsText(response);
+      const usage = response.usageMetadata || retryOutcome.value.usageMetadata || void 0;
       const finishReason = response.candidates?.[0]?.finishReason;
-      this.logger.info(`
-[AI][Gemini] Response finishReason=${finishReason}`);
+      this.logger.info(`[AI][Gemini] ::group::Response`);
+      this.logger.info(`[AI][Gemini] finishReason=${finishReason}`);
       this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
       this.logger.info(`[AI][Gemini] description:
-${text}
-`);
-      this.logUsageDiagnostics(usage, text);
+${text}`);
+      this.logger.info(`::endgroup::`);
+      const diag = buildUsageDiagnostics(usage, text);
+      this.logger.info(`[AI][Gemini] ::group::Usage Diagnostics`);
+      this.logger.info(`[AI][Gemini] prompt=${diag.promptTokens} total=${diag.totalTokens} output=${Math.max(0, diag.totalTokens - diag.promptTokens)} candidates=${diag.candidateTokens}`);
+      if (diag.inferenceNote) this.logger.info(`[AI][Gemini] notes=${diag.inferenceNote}`);
+      this.logger.info(`[AI][Gemini] \u26A0\uFE0F ${Math.round(diag.thoughtsRatio * 100)}% internal reasoning, \u2705 ${Math.round(diag.visibleRatio * 100)}% visible output`);
+      this.logger.info(`::endgroup::`);
+      if (diag.totalTokens - diag.promptTokens === 0) {
+        this.logger.warn("[AI][Gemini] No output tokens reported by API; consider increasing maxOutputTokens if finishReason=MAX_TOKENS.");
+      } else if (diag.thoughtsRatio > 0.9) {
+        this.logger.warn("[AI][Gemini] High thoughts/output token ratio (>90%). Consider increasing maxOutputTokens or tightening the prompt.");
+      }
       if (finishReason === FinishReason.MAX_TOKENS) {
         if (!text || text.trim().length === 0) {
-          const bumped = Math.ceil(initialMaxOutputTokens * 1.5);
+          const bumped = Math.ceil(maxOutputTokens * 1.5);
           this.logger.info(`[AI][Gemini] MAX_TOKENS with empty output; retry maxOutputTokens=${bumped}`);
-          const retryPayload = {
-            contents: [
-              { role: "user", parts: [{ text: !this.supportsSystemInstruction(modelName) ? `${systemText}
-
-${prompt}` : prompt }] }
-            ],
-            generationConfig: { temperature, maxOutputTokens: bumped }
-          };
-          const res = await this.ensureModel(modelUsed).generateContent(retryPayload);
+          const retryPayload = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
+          const res = await this.cache.getOrBuild(retryOutcome.modelUsed).generateContent(retryPayload);
           const retryResp = res.response;
           const retryText = this.concatCandidatePartsText(retryResp);
           const frRetry = retryResp.candidates?.[0]?.finishReason;
@@ -24944,92 +25099,26 @@ ${prompt}` : prompt }] }
         } else {
           this.logger.info("[AI][Gemini] continuation: MAX_TOKENS with non-empty output, requesting continuation...");
           const contPayload = {
-            contents: [
-              { role: "user", parts: [{ text: prompt }] },
-              { role: "model", parts: [{ text }] },
-              { role: "user", parts: [{ text: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }] }
-            ],
-            generationConfig: { temperature, maxOutputTokens: initialMaxOutputTokens }
+            contents: buildContinuationParts(text, prompt),
+            generationConfig: { temperature, maxOutputTokens }
           };
-          const cont = await this.ensureModel(modelUsed).generateContent(contPayload);
+          const cont = await this.cache.getOrBuild(retryOutcome.modelUsed).generateContent(contPayload);
           const contResp = cont.response;
           const more = this.concatCandidatePartsText(contResp);
           const fr2 = contResp.candidates?.[0]?.finishReason;
-          this.logger.info(`
-[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
+          this.logger.info(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
           this.logger.info(`[AI][Gemini] more:
-${more}
-`);
+${more}`);
           text = (text + "\n\n" + more).trim();
         }
       }
       return text;
-    } catch (error4) {
-      this.logger.error(`[AI][Gemini] exception message=${error4.message}`);
-      throw new Error(`Gemini API Error: ${error4.message}`);
+    } catch (error3) {
+      const status = error3?.status;
+      const msg = error3?.message ? String(error3.message) : String(error3);
+      this.logger.error(`[AI][Gemini] \u274C exception status=${status ?? "n/a"} message=${msg}`);
+      throw AIError.wrap(`Gemini API Error: ${msg}`, { provider: "Gemini", statusCode: status });
     }
-  }
-  // Retry helper with fallback ladder
-  async generateWithRetry(payload, initialModel) {
-    const maxAttempts = 100;
-    const baseDelayMs = 1e3;
-    const maxDelayMs = 3e4;
-    const jitterMs = 250;
-    const ladder = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-flash"];
-    const ordered = [initialModel, ...ladder.filter((m) => m !== initialModel)];
-    let currentModelIndex = 0;
-    let currentModel = ordered[currentModelIndex];
-    let consecutive503 = 0;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs) + Math.floor(Math.random() * jitterMs);
-      this.logger.info(`[AI][Gemini] Attempt ${attempt} model=${currentModel}`);
-      try {
-        const localModel = this.ensureModel(currentModel);
-        const res = await localModel.generateContent(payload);
-        this.logger.info(`[AI][Gemini] success attempt=${attempt} model=${currentModel}`);
-        return { result: res, modelUsed: currentModel };
-      } catch (err) {
-        const e = err;
-        const status = typeof e?.status === "number" ? e.status : void 0;
-        const statusText = typeof e?.statusText === "string" ? e.statusText : void 0;
-        const msg = e?.message ?? String(err);
-        const is429 = status === 429 || /\b429\b/.test(msg);
-        const is503 = status === 503 || /\b503\b/.test(msg) || /overload|unavailable|temporarily/i.test(msg);
-        if (is503) consecutive503++;
-        else consecutive503 = 0;
-        if (is429 || is503) {
-          if (is503 && consecutive503 > 10 && currentModelIndex < ordered.length - 1) {
-            const nextModel = ordered[++currentModelIndex];
-            this.logger.warn(`[AI][Gemini] persistent 503 after ${consecutive503} attempts; switching model ${currentModel} -> ${nextModel}`);
-            currentModel = nextModel;
-          }
-          this.logger.warn(`[AI][Gemini] retryable error status=${status ?? "n/a"} text=${statusText ?? ""} message=${msg}`);
-          this.logger.warn(`[AI][Gemini] will retry attempt=${attempt + 1} in ${delay}ms (exponential backoff + jitter)`);
-          if (attempt >= maxAttempts) throw err;
-          await new Promise((r) => setTimeout(r, delay));
-          continue;
-        }
-        this.logger.warn(`[AI][Gemini] non-retryable error attempt=${attempt}: ${msg}`);
-        throw err;
-      }
-    }
-    throw new Error("Exhausted retry attempts for Gemini generateContent");
-  }
-  // Build or reuse model instance
-  ensureModel(name) {
-    if (this.currentModelName === name && this.currentModel) return this.currentModel;
-    this.currentModel = this.buildModel(name);
-    this.currentModelName = name;
-    return this.currentModel;
-  }
-  // Provider adapter – encapsulates Gemini SDK specifics
-  buildModel(name) {
-    const client = new GoogleGenerativeAI(this.config.apiKey);
-    const params = {
-      model: name,
-      ...this.supportsSystemInstruction(name) ? { systemInstruction: this.config.systemText } : {}
-    };
-    return client.getGenerativeModel(params);
   }
   supportsSystemInstruction(name) {
     return name.toLowerCase().startsWith("gemini-2");
@@ -25048,128 +25137,96 @@ ${more}
     }
     return buf.join("").trim();
   }
-  logUsageDiagnostics(usage, text) {
-    const num = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
-    const prompt = num(usage?.promptTokenCount);
-    const candidates = num(usage?.candidatesTokenCount);
-    const total = num(usage?.totalTokenCount);
-    const thoughtsReported = num(usage?.thoughtsTokenCount);
-    const outputTotal = Math.max(0, total - prompt);
-    const approxVisibleRaw = Math.max(0, Math.ceil((text || "").length / 4));
-    const visibleApprox = Math.min(approxVisibleRaw, outputTotal);
-    let thoughts = 0;
-    let inferenceNote = null;
-    if (thoughtsReported > 0) {
-      thoughts = Math.min(thoughtsReported, outputTotal);
-    } else if (candidates > 0) {
-      thoughts = Math.max(0, Math.min(candidates - visibleApprox, outputTotal));
-      inferenceNote = "estimated from candidates \u2212 visible";
-    } else {
-      thoughts = Math.max(0, outputTotal - visibleApprox);
-      if (outputTotal > 0) {
-        inferenceNote = "inferred from (total \u2212 prompt) \u2212 visible";
-      }
-    }
-    const denom = Math.max(1, outputTotal);
-    const thoughtsRatio = thoughts / denom;
-    const visibleRatio = Math.max(0, 1 - thoughtsRatio);
-    const pct = (v) => `${Math.round(v * 100)}%`;
-    this.logger.info("\n[AI][Gemini] Usage Summary");
-    this.logger.info(`prompt=${prompt}  total=${total}  output=${outputTotal}  candidates=${candidates}${thoughtsReported ? `  thoughtsReported=${thoughtsReported}` : ""}`);
-    if (inferenceNote) {
-      this.logger.info(`notes=${inferenceNote}`);
-    }
-    this.logger.info(`\u26A0\uFE0F ${pct(thoughtsRatio)} internal reasoning, \u2705 ${pct(visibleRatio)} visible output (as share of output tokens)
-`);
-    if (outputTotal === 0) {
-      this.logger.warn("[AI][Gemini] No output tokens reported by API; consider increasing maxOutputTokens if finishReason=MAX_TOKENS.");
-    } else if (thoughtsRatio > 0.9) {
-      this.logger.warn("[AI][Gemini] High thoughts/output token ratio (>90%). Consider increasing maxOutputTokens or tightening the prompt.");
-    } else if (thoughtsRatio >= 0.2 && thoughtsRatio <= 0.3) {
-      this.logger.info("\u2705 Balanced usage");
-    }
-  }
 };
 var gemini_ai_helper_default = GeminiAIHelper;
 
 // src/ai/open-ai-helper.ts
-var core = __toESM(require_core());
 var OpenAIHelper = class {
-  apiKey;
-  temperature;
-  model;
-  constructor(aiHelperParams) {
-    Object.assign(this, aiHelperParams);
+  constructor(params) {
+    this.config = params.config;
+    this.logger = params.logger;
   }
-  async createPullRequestDescription(diffOutput, prompt) {
+  async createPullRequestDescription(_diffOutput, prompt) {
+    const { model, temperature, systemText } = this.config;
+    const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
     try {
-      const modelName = this.model?.trim() || "gpt-4.1";
-      const promptPreview = prompt.length > 2e3 ? `${prompt.slice(0, 2e3)}[...]` : prompt;
-      core.startGroup("[AI][OpenAI] Request");
-      core.info(`model=${modelName} temperature=${this.temperature}`);
-      core.info(`promptLength=${prompt.length}`);
-      core.info(`truncatedPreview:
+      this.logger.info(`[AI][OpenAI] ::group::Request`);
+      this.logger.info(`[AI][OpenAI] model=${model} temperature=${temperature}`);
+      this.logger.info(`[AI][OpenAI] promptLength=${prompt.length}`);
+      this.logger.info(`[AI][OpenAI] promptPreview:
 ${promptPreview}`);
-      core.endGroup();
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: modelName,
-          messages: [
-            { role: "system", content: "You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions." },
-            { role: "user", content: prompt }
-          ],
-          temperature: this.temperature,
-          max_tokens: 2048
-        })
-      });
-      const raw = await response.text();
-      if (!response.ok) {
-        core.error(`[AI][OpenAI] http_error status=${response.status} body=${raw}`);
-        throw new Error(`OpenAI API HTTP ${response.status}: ${raw}`);
-      }
-      let data;
-      try {
-        data = JSON.parse(raw);
-      } catch (e) {
-        core.error(`[AI][OpenAI] parse_error body=${raw}`);
-        throw e;
-      }
-      if (data.error) {
-        core.error(`[AI][OpenAI] api_error code=${data.error.code || ""} message=${data.error.message || ""}`);
-        throw new Error(`OpenAI API Error: ${data.error.message}`);
-      }
-      let description = (data.choices?.[0]?.message?.content || "").trim();
-      const finishReason = data.choices?.[0]?.finish_reason || data.choices?.[0]?.finishReason;
-      const usage = data.usage || {};
-      core.startGroup("[AI][OpenAI] Response");
-      core.info(`finishReason=${finishReason}`);
-      core.info(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
-      core.info(`description:
-${description}`);
-      core.endGroup();
-      if (finishReason === "length") {
-        core.info("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
-        const contResp = await fetch("https://api.openai.com/v1/chat/completions", {
+      this.logger.info(`::endgroup::`);
+      const perform = async (activeModel) => {
+        const response = await fetch((this.config.baseUrl || "https://api.openai.com") + "/v1/chat/completions", {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${this.apiKey}`,
+            "Authorization": `Bearer ${this.config.apiKey}`,
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            model: modelName,
+            model: activeModel,
             messages: [
-              { role: "system", content: "You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions." },
+              { role: "system", content: systemText },
+              { role: "user", content: prompt }
+            ],
+            temperature,
+            max_tokens: this.config.maxOutputTokens
+          })
+        });
+        const raw = await response.text();
+        if (!response.ok) {
+          throw new AIError(`OpenAI API HTTP ${response.status}: ${raw}`, { provider: "OpenAI", model: activeModel, statusCode: response.status });
+        }
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch (e) {
+          throw new AIError("OpenAI API parse error", { provider: "OpenAI", model: activeModel }, e);
+        }
+        if (data.error) {
+          throw new AIError(`OpenAI API Error: ${data.error.message}`, { provider: "OpenAI", model: activeModel, statusCode: data.error?.code });
+        }
+        return data;
+      };
+      const retryOutcome = await generateWithRetry(perform, {
+        logger: this.logger,
+        provider: "OpenAI",
+        initialModel: model,
+        retry: this.config.retry
+      });
+      let description = (retryOutcome.value.choices?.[0]?.message?.content || "").trim();
+      const finishReason = retryOutcome.value.choices?.[0]?.finish_reason || retryOutcome.value.choices?.[0]?.finishReason;
+      const usage = retryOutcome.value.usage || {};
+      this.logger.info(`[AI][OpenAI] ::group::Response`);
+      this.logger.info(`[AI][OpenAI] finishReason=${finishReason}`);
+      this.logger.info(`[AI][OpenAI] usage=${JSON.stringify(usage)} descLength=${description.length}`);
+      this.logger.info(`[AI][OpenAI] description:
+${description}`);
+      this.logger.info(`::endgroup::`);
+      const diag = buildUsageDiagnostics(usage, description);
+      this.logger.info(`[AI][OpenAI] ::group::Usage Diagnostics`);
+      this.logger.info(`[AI][OpenAI] prompt=${diag.promptTokens} total=${diag.totalTokens} output=${Math.max(0, diag.totalTokens - diag.promptTokens)} candidates=${diag.candidateTokens}`);
+      if (diag.inferenceNote) this.logger.info(`[AI][OpenAI] notes=${diag.inferenceNote}`);
+      this.logger.info(`[AI][OpenAI] \u26A0\uFE0F ${Math.round(diag.thoughtsRatio * 100)}% internal reasoning, \u2705 ${Math.round(diag.visibleRatio * 100)}% visible output`);
+      this.logger.info(`::endgroup::`);
+      if (finishReason === "length") {
+        this.logger.info("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
+        const contResp = await fetch((this.config.baseUrl || "https://api.openai.com") + "/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${this.config.apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: systemText },
               { role: "user", content: prompt },
               { role: "assistant", content: description },
               { role: "user", content: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }
             ],
-            temperature: this.temperature,
-            max_tokens: 1024
+            temperature,
+            max_tokens: Math.floor(this.config.maxOutputTokens / 2)
           })
         });
         const contRaw = await contResp.text();
@@ -25182,54 +25239,111 @@ ${description}`);
           }
           const more = (contData.choices?.[0]?.message?.content || "").trim();
           const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
-          core.startGroup("[AI][OpenAI] Continuation Response");
-          core.info(`finishReason=${fr2}`);
-          core.info(`moreLength=${more.length}`);
-          core.info(`more:
+          this.logger.info(`[AI][OpenAI] Continuation finishReason=${fr2} moreLength=${more.length}`);
+          this.logger.info(`[AI][OpenAI] more:
 ${more}`);
-          core.endGroup();
           description = (description + "\n\n" + more).trim();
         } else {
-          core.warning(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
+          this.logger.warn(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
         }
       }
       return description;
-    } catch (error4) {
-      core.error(`[AI][OpenAI] exception message=${error4.message}`);
-      throw new Error(`OpenAI API Error: ${error4.message}`);
+    } catch (error3) {
+      const status = error3?.statusCode || error3?.status;
+      const msg = error3?.message ? String(error3.message) : String(error3);
+      this.logger.error(`[AI][OpenAI] \u274C exception status=${status ?? "n/a"} message=${msg}`);
+      throw AIError.wrap(`OpenAI API Error: ${msg}`, { provider: "OpenAI", statusCode: status });
     }
   }
 };
 var open_ai_helper_default = OpenAIHelper;
 
+// src/ai/config-utils.ts
+var DEFAULT_MAX_OUTPUT_TOKENS = 1536;
+var MIN_MAX_OUTPUT_TOKENS = 768;
+var DEFAULT_RETRY_CONFIG = {
+  maxAttempts: 8,
+  baseDelayMs: 1e3,
+  maxDelayMs: 3e4,
+  jitterMs: 250,
+  consecutive503ToSwitch: 10,
+  modelLadder: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-flash"]
+};
+function clampMaxOutputTokens(value) {
+  if (!Number.isFinite(value) || value <= 0) return DEFAULT_MAX_OUTPUT_TOKENS;
+  return Math.max(MIN_MAX_OUTPUT_TOKENS, Math.floor(value));
+}
+function readIntEnv(name, fallback) {
+  const raw = (process.env[name] || "").trim();
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+function buildRetryConfigFromEnv(base) {
+  return {
+    maxAttempts: readIntEnv("RETRY_MAX_ATTEMPTS", base?.maxAttempts) ?? DEFAULT_RETRY_CONFIG.maxAttempts,
+    baseDelayMs: readIntEnv("RETRY_BASE_DELAY_MS", base?.baseDelayMs) ?? DEFAULT_RETRY_CONFIG.baseDelayMs,
+    maxDelayMs: readIntEnv("RETRY_MAX_DELAY_MS", base?.maxDelayMs) ?? DEFAULT_RETRY_CONFIG.maxDelayMs,
+    jitterMs: readIntEnv("RETRY_JITTER_MS", base?.jitterMs) ?? DEFAULT_RETRY_CONFIG.jitterMs,
+    consecutive503ToSwitch: readIntEnv("RETRY_CONSEC_503_SWITCH", base?.consecutive503ToSwitch) ?? DEFAULT_RETRY_CONFIG.consecutive503ToSwitch,
+    modelLadder: base?.modelLadder ?? DEFAULT_RETRY_CONFIG.modelLadder
+  };
+}
+function buildProviderCommonConfig(params) {
+  const maxOutputTokensEnv = clampMaxOutputTokens(readIntEnv("MAX_OUTPUT_TOKENS", params.maxOutputTokens));
+  return {
+    model: params.model,
+    temperature: params.temperature,
+    maxOutputTokens: maxOutputTokensEnv,
+    systemText: params.systemText,
+    retry: buildRetryConfigFromEnv(params.retry)
+  };
+}
+function buildGeminiConfig(aiParams, options) {
+  const providerDefaults = {
+    model: (aiParams.model || "gemini-2.5-flash").trim(),
+    temperature: aiParams.temperature,
+    systemText: (options?.systemText || "You are very good at reviewing code and can generate pull request descriptions.").trim()
+  };
+  const common = buildProviderCommonConfig(providerDefaults);
+  return {
+    apiKey: aiParams.apiKey,
+    ...common
+  };
+}
+function buildOpenAIConfig(aiParams, options) {
+  const providerDefaults = {
+    model: (aiParams.model || "gpt-4.1").trim(),
+    temperature: aiParams.temperature,
+    systemText: (options?.systemText || "You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions.").trim()
+  };
+  const common = buildProviderCommonConfig({ ...providerDefaults, retry: { modelLadder: options?.modelLadder } });
+  return {
+    apiKey: aiParams.apiKey,
+    baseUrl: options?.baseUrl,
+    ...common
+  };
+}
+
 // src/ai/ai-helper-resolver.ts
 var aiHelperResolver = (aiHelperParams) => {
   const { aiName, model, temperature } = aiHelperParams;
-  core2.info(`[AI] Resolver -> provider=${aiName}, model=${model}, temperature=${temperature}`);
-  switch (aiName) {
+  core.info(`[AI] Resolver -> provider=${aiName}, model=${model}, temperature=${temperature}`);
+  const logger = {
+    info: (msg) => core.info(msg),
+    warn: (msg) => core.warning(msg),
+    error: (msg) => core.error(msg),
+    debug: (msg) => core.info(msg)
+  };
+  switch (aiName?.toLowerCase()) {
     case "open-ai":
-    case "openai":
-      return new open_ai_helper_default(aiHelperParams);
+    case "openai": {
+      const config = buildOpenAIConfig(aiHelperParams);
+      return new open_ai_helper_default({ config, logger });
+    }
     case "gemini":
     default: {
-      const modelName = (model || "gemini-2.5-flash").trim();
-      const maxTokensEnv = Number.parseInt(process.env.MAX_OUTPUT_TOKENS || "", 10);
-      const maxOutputTokens = Number.isFinite(maxTokensEnv) && maxTokensEnv > 0 ? Math.max(768, maxTokensEnv) : 1536;
-      const systemText = "You are very good at reviewing code and can generate pull request descriptions.";
-      const config = {
-        apiKey: aiHelperParams.apiKey,
-        model: modelName,
-        temperature: aiHelperParams.temperature,
-        maxOutputTokens,
-        systemText
-      };
-      const logger = {
-        info: (msg) => core2.info(msg),
-        warn: (msg) => core2.warning(msg),
-        error: (msg) => core2.error(msg),
-        // Route debug lines to info for better visibility in Actions
-        debug: (msg) => core2.info(msg)
-      };
+      const config = buildGeminiConfig(aiHelperParams);
       return new gemini_ai_helper_default({ config, logger });
     }
   }
@@ -25237,10 +25351,9 @@ var aiHelperResolver = (aiHelperParams) => {
 var ai_helper_resolver_default = aiHelperResolver;
 
 // src/git-helper.ts
-var core3 = __toESM(require_core());
+var core2 = __toESM(require_core());
 var import_child_process = require("child_process");
 var GitHelper = class {
-  ignores;
   constructor(ignores) {
     this.ignores = ignores;
   }
@@ -25257,19 +25370,15 @@ var GitHelper = class {
       ":!**/dist/*"
     ];
     const ignoreFiles = this.ignores ? this.ignores.split(",").map((item) => `:!${item.trim()}`) : defaultIgnoreFiles;
-    core3.info(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
+    core2.info(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
     const diffOutput = (0, import_child_process.execSync)(`git diff origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(" ")}`, { encoding: "utf8" });
-    core3.info(`Filtered diff length: ${diffOutput.length}`);
+    core2.info(`Filtered diff length: ${diffOutput.length}`);
     return diffOutput;
   }
 };
 
 // src/pull-request-updater.ts
 var PullRequestUpdater = class {
-  gitHelper;
-  context;
-  aiHelper;
-  octokit;
   constructor() {
     this.gitHelper = new GitHelper((0, import_core.getInput)("ignores"));
     this.context = import_github.context;
@@ -25278,7 +25387,7 @@ var PullRequestUpdater = class {
     const apiKey = (0, import_core.getInput)("api_key", { required: true }).trim();
     const temperature = Number.parseFloat((0, import_core.getInput)("temperature") || "0.8");
     this.aiHelper = ai_helper_resolver_default({ apiKey, aiName, temperature, model });
-    core4.info(`[PR-Description] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
+    core3.info(`[PR-Description] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
     const githubToken = (0, import_core.getInput)("github_token", { required: true }).trim();
     this.octokit = (0, import_github.getOctokit)(githubToken);
   }
@@ -25315,29 +25424,29 @@ var PullRequestUpdater = class {
       const { baseBranch, headBranch } = this.extractBranchRefs();
       this.gitHelper.setupGitConfiguration();
       await this.gitHelper.fetchGitBranches(baseBranch, headBranch);
-      core4.startGroup("Diff and Prompt");
+      core3.startGroup("Diff and Prompt");
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
-      core4.info(`[PR-Description] diff length=${diffOutput.length}`);
+      core3.info(`[PR-Description] diff length=${diffOutput.length}`);
       const prompt = this.generatePrompt(diffOutput, creator);
-      core4.info(`[PR-Description] prompt length=${prompt.length}`);
-      core4.endGroup();
-      core4.startGroup("AI Generation");
-      core4.info("[PR-Description] calling AI to generate description");
+      core3.info(`[PR-Description] prompt length=${prompt.length}`);
+      core3.endGroup();
+      core3.startGroup("AI Generation");
+      core3.info("[PR-Description] calling AI to generate description");
       const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
-      core4.info(`[PR-Description] AI description length=${generatedDescription.length}`);
-      core4.info(`[PR-Description] AI description content:
+      core3.info(`[PR-Description] AI description length=${generatedDescription.length}`);
+      core3.info(`[PR-Description] AI description content:
 ${generatedDescription}`);
-      core4.endGroup();
-      core4.startGroup("PR Update");
-      core4.info(`[PR-Description] updating pull request #${pullRequestNumber}`);
+      core3.endGroup();
+      core3.startGroup("PR Update");
+      core3.info(`[PR-Description] updating pull request #${pullRequestNumber}`);
       await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
-      core4.endGroup();
+      core3.endGroup();
       (0, import_core.setOutput)("pr_number", pullRequestNumber.toString());
       (0, import_core.setOutput)("description", generatedDescription);
-      core4.info(`Successfully updated PR #${pullRequestNumber} description.`);
-    } catch (error4) {
-      const errorMessage = error4 instanceof Error ? error4.message : "Unknown error";
-      core4.setFailed(errorMessage);
+      core3.info(`Successfully updated PR #${pullRequestNumber} description.`);
+    } catch (error3) {
+      const errorMessage = error3 instanceof Error ? error3.message : "Unknown error";
+      core3.setFailed(errorMessage);
     }
   }
   validateEventContext() {
@@ -25349,8 +25458,8 @@ ${generatedDescription}`);
   extractBranchRefs() {
     const baseBranch = this.context.payload.pull_request.base.ref;
     const headBranch = this.context.payload.pull_request.head.ref;
-    core4.info(`Base branch: ${baseBranch}`);
-    core4.info(`Head branch: ${headBranch}`);
+    core3.info(`Base branch: ${baseBranch}`);
+    core3.info(`Head branch: ${headBranch}`);
     return { baseBranch, headBranch };
   }
   async updatePullRequestDescription(pullRequestNumber, generatedDescription) {
@@ -25363,13 +25472,13 @@ ${generatedDescription}`);
           currentDescription
         );
       }
-      core4.info(`[PR-Description] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
-      core4.info(`[PR-Description] new description content:
+      core3.info(`[PR-Description] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
+      core3.info(`[PR-Description] new description content:
 ${generatedDescription}`);
       await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
-    } catch (error4) {
-      core4.error(`Error updating PR #${pullRequestNumber} description: ${error4.message}`);
-      throw error4;
+    } catch (error3) {
+      core3.error(`Error updating PR #${pullRequestNumber} description: ${error3.message}`);
+      throw error3;
     }
   }
   async fetchPullRequestDetails(pullRequestNumber) {
@@ -25384,7 +25493,7 @@ ${generatedDescription}`);
     return this.context.payload.pull_request.head.ref.replace("feat/", "").replace("fix/", "");
   }
   async postOriginalDescriptionComment(pullRequestNumber, currentDescription) {
-    core4.info("Creating comment with original description...");
+    core3.info("Creating comment with original description...");
     await this.octokit.rest.issues.createComment({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
@@ -25393,17 +25502,17 @@ ${generatedDescription}`);
 
 ${currentDescription}`
     });
-    core4.info("Comment created successfully.");
+    core3.info("Comment created successfully.");
   }
   async applyPullRequestUpdate(pullRequestNumber, newDescription) {
-    core4.info("Updating PR description...");
+    core3.info("Updating PR description...");
     await this.octokit.rest.pulls.update({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       pull_number: pullRequestNumber,
       body: newDescription
     });
-    core4.info("PR description updated successfully.");
+    core3.info("PR description updated successfully.");
   }
 };
 var pull_request_updater_default = PullRequestUpdater;

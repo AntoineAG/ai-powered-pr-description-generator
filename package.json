@@ -3,7 +3,8 @@
   "version": "1.1.0",
   "description": "GitHub Action automatically generates descriptive summaries for pull requests using AI, enhancing clarity and context for reviewers.",
   "scripts": {
-    "build": "esbuild index.ts --bundle --outfile=dist/bundle.js --platform=node"
+    "build": "esbuild index.ts --bundle --outfile=dist/bundle.js --platform=node",
+    "test": "tsc -p tsconfig.json && node --test build/tests"
   },
   "author": "Rock Chen",
   "dependencies": {

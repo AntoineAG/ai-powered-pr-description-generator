@@ -1,85 +1,102 @@
-import * as core from '@actions/core';
-import { AIHelperInterface, AIHelperParams } from './types';
+import { AIError } from './ai-error';
+import { PROMPT_PREVIEW_LIMIT, previewText } from './prompt-utils';
+import { generateWithRetry } from './retry-utils';
+import { AIHelperInterface, Logger, OpenAIConfig } from './types';
+import { buildUsageDiagnostics } from './usage-diagnostics';
 
 class OpenAIHelper implements AIHelperInterface {
-  private apiKey: string;
-  private temperature: number;
-  private model?: string;
+  private readonly config: OpenAIConfig;
+  private readonly logger: Logger;
 
-  constructor(aiHelperParams: AIHelperParams) {
-    Object.assign(this, aiHelperParams);
+  constructor(params: { config: OpenAIConfig; logger: Logger }) {
+    this.config = params.config;
+    this.logger = params.logger;
   }
 
-  async createPullRequestDescription(diffOutput: string, prompt: string): Promise<string> {
+  async createPullRequestDescription(_diffOutput: string, prompt: string): Promise<string> {
+    const { model, temperature, systemText } = this.config;
+    const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
     try {
-      const modelName = this.model?.trim() || 'gpt-4.1';
-      const promptPreview = prompt.length > 2000 ? `${prompt.slice(0, 2000)}[...]` : prompt;
-      core.startGroup('[AI][OpenAI] Request');
-      core.info(`model=${modelName} temperature=${this.temperature}`);
-      core.info(`promptLength=${prompt.length}`);
-      core.info(`truncatedPreview:\n${promptPreview}`);
-      core.endGroup();
+      this.logger.info(`[AI][OpenAI] ::group::Request`);
+      this.logger.info(`[AI][OpenAI] model=${model} temperature=${temperature}`);
+      this.logger.info(`[AI][OpenAI] promptLength=${prompt.length}`);
+      this.logger.info(`[AI][OpenAI] promptPreview:\n${promptPreview}`);
+      this.logger.info(`::endgroup::`);
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: modelName,
-          messages: [
-            { role: 'system', content: 'You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions.' },
-            { role: 'user', content: prompt },
-          ],
-          temperature: this.temperature,
-          max_tokens: 2048,
-        }),
-      });
-
-      const raw = await response.text();
-      if (!response.ok) {
-        core.error(`[AI][OpenAI] http_error status=${response.status} body=${raw}`);
-        throw new Error(`OpenAI API HTTP ${response.status}: ${raw}`);
-      }
-      let data: any;
-      try { data = JSON.parse(raw); } catch (e) {
-        core.error(`[AI][OpenAI] parse_error body=${raw}`);
-        throw e;
-      }
-      if (data.error) {
-        core.error(`[AI][OpenAI] api_error code=${data.error.code || ''} message=${data.error.message || ''}`);
-        throw new Error(`OpenAI API Error: ${data.error.message}`);
-      }
-
-      let description = (data.choices?.[0]?.message?.content || '').trim();
-      const finishReason = data.choices?.[0]?.finish_reason || data.choices?.[0]?.finishReason;
-      const usage = data.usage || {};
-      core.startGroup('[AI][OpenAI] Response');
-      core.info(`finishReason=${finishReason}`);
-      core.info(`usage=${JSON.stringify(usage)} descLength=${description.length}`);
-      core.info(`description:\n${description}`);
-      core.endGroup();
-
-      // If output was cut by token limit, try a single continuation
-      if (finishReason === 'length') {
-        core.info('[AI][OpenAI] continuation: finish_reason=length, requesting more...');
-        const contResp = await fetch('https://api.openai.com/v1/chat/completions', {
+      const perform = async (activeModel: string) => {
+        const response = await fetch((this.config.baseUrl || 'https://api.openai.com') + '/v1/chat/completions', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            'Authorization': `Bearer ${this.config.apiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: modelName,
+            model: activeModel,
             messages: [
-              { role: 'system', content: 'You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions.' },
+              { role: 'system', content: systemText },
+              { role: 'user', content: prompt },
+            ],
+            temperature,
+            max_tokens: this.config.maxOutputTokens,
+          }),
+        });
+        const raw = await response.text();
+        if (!response.ok) {
+          throw new AIError(`OpenAI API HTTP ${response.status}: ${raw}`, { provider: 'OpenAI', model: activeModel, statusCode: response.status });
+        }
+        let data: any;
+        try { data = JSON.parse(raw); } catch (e) {
+          throw new AIError('OpenAI API parse error', { provider: 'OpenAI', model: activeModel }, e);
+        }
+        if (data.error) {
+          throw new AIError(`OpenAI API Error: ${data.error.message}`, { provider: 'OpenAI', model: activeModel, statusCode: data.error?.code });
+        }
+        return data;
+      };
+
+      const retryOutcome = await generateWithRetry<any>(perform, {
+        logger: this.logger,
+        provider: 'OpenAI',
+        initialModel: model,
+        retry: this.config.retry,
+      });
+
+      let description = (retryOutcome.value.choices?.[0]?.message?.content || '').trim();
+      const finishReason = retryOutcome.value.choices?.[0]?.finish_reason || retryOutcome.value.choices?.[0]?.finishReason;
+      const usage = retryOutcome.value.usage || {};
+
+      this.logger.info(`[AI][OpenAI] ::group::Response`);
+      this.logger.info(`[AI][OpenAI] finishReason=${finishReason}`);
+      this.logger.info(`[AI][OpenAI] usage=${JSON.stringify(usage)} descLength=${description.length}`);
+      this.logger.info(`[AI][OpenAI] description:\n${description}`);
+      this.logger.info(`::endgroup::`);
+
+      const diag = buildUsageDiagnostics(usage, description);
+      this.logger.info(`[AI][OpenAI] ::group::Usage Diagnostics`);
+      this.logger.info(`[AI][OpenAI] prompt=${diag.promptTokens} total=${diag.totalTokens} output=${Math.max(0, diag.totalTokens - diag.promptTokens)} candidates=${diag.candidateTokens}`);
+      if (diag.inferenceNote) this.logger.info(`[AI][OpenAI] notes=${diag.inferenceNote}`);
+      this.logger.info(`[AI][OpenAI] ⚠️ ${Math.round(diag.thoughtsRatio * 100)}% internal reasoning, ✅ ${Math.round(diag.visibleRatio * 100)}% visible output`);
+      this.logger.info(`::endgroup::`);
+
+      // If output was cut by token limit, try a single continuation
+      if (finishReason === 'length') {
+        this.logger.info('[AI][OpenAI] continuation: finish_reason=length, requesting more...');
+        const contResp = await fetch((this.config.baseUrl || 'https://api.openai.com') + '/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.config.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: systemText },
               { role: 'user', content: prompt },
               { role: 'assistant', content: description },
-              { role: 'user', content: 'Continue from where you left off. Do not repeat earlier content. Keep the same structure and style.' }
+              { role: 'user', content: 'Continue from where you left off. Do not repeat earlier content. Keep the same structure and style.' },
             ],
-            temperature: this.temperature,
-            max_tokens: 1024,
+            temperature,
+            max_tokens: Math.floor(this.config.maxOutputTokens / 2),
           }),
         });
         const contRaw = await contResp.text();
@@ -88,21 +105,20 @@ class OpenAIHelper implements AIHelperInterface {
           try { contData = JSON.parse(contRaw); } catch { contData = {}; }
           const more = (contData.choices?.[0]?.message?.content || '').trim();
           const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
-          core.startGroup('[AI][OpenAI] Continuation Response');
-          core.info(`finishReason=${fr2}`);
-          core.info(`moreLength=${more.length}`);
-          core.info(`more:\n${more}`);
-          core.endGroup();
+          this.logger.info(`[AI][OpenAI] Continuation finishReason=${fr2} moreLength=${more.length}`);
+          this.logger.info(`[AI][OpenAI] more:\n${more}`);
           description = (description + '\n\n' + more).trim();
         } else {
-          core.warning(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
+          this.logger.warn(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
         }
       }
 
       return description;
     } catch (error) {
-      core.error(`[AI][OpenAI] exception message=${(error as Error).message}`);
-      throw new Error(`OpenAI API Error: ${(error as Error).message}`);
+      const status = (error as any)?.statusCode || (error as any)?.status;
+      const msg = (error as any)?.message ? String((error as any).message) : String(error);
+      this.logger.error(`[AI][OpenAI] ❌ exception status=${status ?? 'n/a'} message=${msg}`);
+      throw AIError.wrap(`OpenAI API Error: ${msg}`, { provider: 'OpenAI', statusCode: status });
     }
   }
 }
