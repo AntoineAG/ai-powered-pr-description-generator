@@ -25038,6 +25038,7 @@ Title rules:
 
 Description rules:
 - Markdown format. Begin with a subtitle: "## What this PR does?"
+- Provide a simple description of the changes.
 - Numbered list of key changes. Do not paste the raw diff.
 - Keep it simple and reviewer-friendly.
 - Avoid code snippets or images.
