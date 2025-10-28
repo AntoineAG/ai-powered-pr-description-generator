@@ -61,7 +61,7 @@ function buildUnifiedPRPrompt(params) {
         '- Numbered list of key changes. Do not paste the raw diff.',
         '- Keep it simple and reviewer-friendly.',
         '- Avoid code snippets or images.',
-        `- Add some fun with emojis from [${(limits.allowedEmojis || []).join(' ')}] only: at most one emoji per item, and at most 3 total.`,
+        `- Add some fun with emojis from [${(limits.allowedEmojis || []).join(' ')}] only: at most one emoji per item, and at most ${limits.descMaxItems} total.`,
         `- Use max ${limits.descMaxItems} items; each ≤ ${limits.descMaxWordsPerItem} words; total ≤ ${limits.descMaxTotalWords} words.`,
     ];
     if (creator)

@@ -52,7 +52,7 @@ inputs:
   allowed_emojis:
     description: 'Comma-separated emojis allowed in description list.'
     required: false
-    default: '🚀,🎉,👍,👏,🔥'
+    default: '🚀,✨,🎉,✅,👍,👏,🔥,⚡️,🐛,🩹,🚑️,♻️,🧹,🧼,🧽,🧰,🔧,🔨,⚙️,🧱,🏗️,🚧,🤖,👷,📦,📌,🔗,⬆️,⬇️,📈,📊,🔍️,🔎,🔊,🔇,📝,📚,📄,🧾,✏️,🎨,💄,🖌️,🖼️,♿️,🌐,🔒,🔐,🛡️,🔑,💥,⏪️,🔀,🚚,🐳,💬,🚩,🏷️,🔖,💚,📱,🖥️,🔌,💡,🧪,🔬,🗑️,💾,🗂️,🗃️,📡,👀'
 outputs:
   description:
     description: 'The AI-generated description for the pull request, providing context and details for reviewers.'

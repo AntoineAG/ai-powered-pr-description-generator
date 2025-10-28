@@ -71,7 +71,7 @@ Optional environment variables:
  - `desc_max_items` (optional): Max number of bullet items in the description. Default: `5`.
  - `desc_max_words_per_item` (optional): Max words per bullet item. Default: `25`.
  - `desc_max_total_words` (optional): Max total words in the description. Default: `300`.
- - `allowed_emojis` (optional): Comma-separated list of allowed emojis for list items. Default: `"🚀,🎉,👍,👏,🔥"`.
+ - `allowed_emojis` (optional): Comma-separated list of allowed emojis for list items. Default includes a large curated set useful for PRs (features, fixes, docs, tests, CI/CD, perf, security, cleanup, UI, deps, etc.). See `action.yml` for the full default list.
 
 
 ## Usage
