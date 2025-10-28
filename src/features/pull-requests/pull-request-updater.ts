@@ -287,7 +287,7 @@ class PullRequestUpdater {
     bareSubject = this.toImperativeWithLog(bareSubject);
 
     const prefix = `${type}${scope ? `(${scope})` : ''}: `;
-    const maxLen = 72;
+    const maxLen = 200;
     const allowedSubjectLen = Math.max(0, maxLen - prefix.length);
     let finalSubject = bareSubject.length > allowedSubjectLen ? bareSubject.slice(0, allowedSubjectLen).trim() : bareSubject;
     finalSubject = finalSubject.replace(/[\.!?]+$/g, '');
