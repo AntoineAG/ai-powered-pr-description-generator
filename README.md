@@ -67,6 +67,11 @@ Optional environment variables:
   - `gemini` -> `gemini-1.5-pro` (e.g., `gemini-2.5-flash`, `gemini-2.5-flash-lite`)
   - `open-ai` -> `gpt-4.1` (e.g., `gpt-4.1`, `gpt-4.1-mini`)
 - `update_title` (optional): When `true`, also generates and updates the PR title. Default: `false`.
+ - `title_max_len` (optional): Max PR title length in characters. Default: `120`.
+ - `desc_max_items` (optional): Max number of bullet items in the description. Default: `5`.
+ - `desc_max_words_per_item` (optional): Max words per bullet item. Default: `25`.
+ - `desc_max_total_words` (optional): Max total words in the description. Default: `300`.
+ - `allowed_emojis` (optional): Comma-separated list of allowed emojis for list items. Default: `"🚀,🎉,👍,👏,🔥"`.
 
 
 ## Usage
@@ -101,6 +106,11 @@ jobs:
           ai_name: gemini
           ai_model: ${{ env.AI_MODEL }}
           update_title: true
+          title_max_len: 60
+          desc_max_items: 4
+          desc_max_words_per_item: 25
+          desc_max_total_words: 300
+          allowed_emojis: "🚀,👍"
           api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           temperature: "0.4"

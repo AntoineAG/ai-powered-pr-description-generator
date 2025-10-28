@@ -1,12 +1,9 @@
 import { Content, GenerateContentRequest, Part } from '@google/generative-ai';
 import { UnifiedPRSchema } from '../json/schema';
+import type { PromptLimits } from '../types';
 import { jsonModeConfig } from './json.config';
 
 export const PROMPT_PREVIEW_LIMIT = 2000;
-export const ALLOWED_EMOJIS = '🚀 🎉 👍 👏 🔥';
-export const DESC_MAX_ITEMS = 5;
-export const DESC_ITEM_MAX_WORDS = 25;
-export const DESC_MAX_WORDS = 300;
 
 export function previewText(text: string, limit: number = PROMPT_PREVIEW_LIMIT): string {
   if (!text) return '';
@@ -36,11 +33,12 @@ export interface UnifiedPRPromptParams {
   diff: string;
   currentTitle?: string;
   creator?: string;
+  limits: PromptLimits;
 }
 
 /** Builds a unified prompt for PR title + description in strict JSON mode. */
 export function buildUnifiedPRPrompt(params: UnifiedPRPromptParams): string {
-  const { diff, currentTitle, creator } = params;
+  const { diff, currentTitle, creator, limits } = params;
   const lines: string[] = [
     'You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.',
     '',
@@ -60,7 +58,7 @@ export function buildUnifiedPRPrompt(params: UnifiedPRPromptParams): string {
     'Title rules:',
     '- Write in Conventional Commit format: type(scope): subject.',
     '- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.',
-    '- 6–12 words; maximum 72 characters.',
+    `- 6–12 words; maximum ${limits.titleMaxLen} characters.`,
     '- If a current title exists, improve it slightly if useful.',
     '',
     'Description rules:',
@@ -69,8 +67,8 @@ export function buildUnifiedPRPrompt(params: UnifiedPRPromptParams): string {
     '- Numbered list of key changes. Do not paste the raw diff.',
     '- Keep it simple and reviewer-friendly.',
     '- Avoid code snippets or images.',
-    `- Add some fun with emojis from [${ALLOWED_EMOJIS}] only: at most one emoji per item, and at most 3 total.`,
-    `- Use max ${DESC_MAX_ITEMS} items; each ≤ ${DESC_ITEM_MAX_WORDS} words; total ≤ ${DESC_MAX_WORDS} words.`,
+    `- Add some fun with emojis from [${(limits.allowedEmojis || []).join(' ')}] only: at most one emoji per item, and at most ${limits.descMaxItems} total.`,
+    `- Use max ${limits.descMaxItems} items; each ≤ ${limits.descMaxWordsPerItem} words; total ≤ ${limits.descMaxTotalWords} words.`,
   ];
   if (creator) lines.push(`- Thank **${creator}** for the contribution! 🎉`);
   lines.push('', 'Context:');
@@ -78,4 +76,3 @@ export function buildUnifiedPRPrompt(params: UnifiedPRPromptParams): string {
   lines.push(`Diff:\n${diff}`);
   return lines.join('\n');
 }
-

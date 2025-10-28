@@ -1,6 +1,15 @@
+export type PromptLimits = {
+  titleMaxLen: number;
+  descMaxItems: number;
+  descMaxWordsPerItem: number;
+  descMaxTotalWords: number;
+  allowedEmojis: string[];
+};
+
 export interface GeneratePRParams {
   currentTitle?: string;
   creator?: string;
+  limits?: PromptLimits;
 }
 
 export interface PullRequestContentResult {

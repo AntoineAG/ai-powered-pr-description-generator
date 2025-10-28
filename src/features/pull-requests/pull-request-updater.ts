@@ -2,7 +2,7 @@ import * as core from '@actions/core';
 import { getInput, setFailed, setOutput } from '@actions/core';
 import { context, getOctokit } from '@actions/github';
 import aiHelperResolver from '../../core/resolver';
-import { AIHelperInterface } from '../../core/types';
+import { AIHelperInterface, PromptLimits } from '../../core/types';
 import { GitHelper } from '../../integrations/github/git.helper';
 
 /**
@@ -15,8 +15,7 @@ class PullRequestUpdater {
   private readonly aiHelper: AIHelperInterface;
   private readonly octokit: ReturnType<typeof getOctokit>;
   private readonly updateTitle: boolean;
-  private static readonly MAX_TITLE_LENGTH = 72;
-  private static readonly LARGE_DIFF_THRESHOLD = 50000;
+  private readonly limits: PromptLimits;
 
   constructor() {
     this.gitHelper = new GitHelper(getInput('ignores'));
@@ -33,6 +32,64 @@ class PullRequestUpdater {
     const githubToken = getInput('github_token', { required: true }).trim();
     this.octokit = getOctokit(githubToken);
     this.updateTitle = (getInput('update_title') || '').toLowerCase() === 'true';
+
+    // Read and validate prompt limits from inputs
+    this.limits = this.readPromptLimitsFromInputs();
+    core.info(`[PR] limits ${JSON.stringify(this.limits)}`);
+  }
+
+  private clamp(n: number, min: number, max: number): number { return Math.max(min, Math.min(max, n)); }
+
+  private parseIntOrDefault(raw: string | undefined, fallback: number, nameForLog: string, min: number, max: number): number {
+    const s = (raw || '').trim();
+    const v = Number.parseInt(s, 10);
+    if (!Number.isFinite(v)) {
+      core.warning(`[PR][limits] ${nameForLog} invalid ('${raw ?? ''}'); using default ${fallback}`);
+      return fallback;
+    }
+    const clamped = this.clamp(v, min, max);
+    if (clamped !== v) {
+      core.warning(`[PR][limits] ${nameForLog} out of range (${v}); clamped to ${clamped}`);
+    }
+    return clamped;
+  }
+
+  private readPromptLimitsFromInputs(): PromptLimits {
+    // Defaults mirror action.yml defaults
+    const DEFAULTS = {
+      titleMaxLen: 120,
+      descMaxItems: 5,
+      descMaxWordsPerItem: 25,
+      descMaxTotalWords: 300,
+      allowedEmojis: ['🚀','🎉','👍','👏','🔥'],
+    } as const;
+
+    const titleRaw = getInput('title_max_len');
+    const itemsRaw = getInput('desc_max_items');
+    const wordsPerItemRaw = getInput('desc_max_words_per_item');
+    const totalWordsRaw = getInput('desc_max_total_words');
+    const emojisRaw = getInput('allowed_emojis');
+
+    const titleMaxLen = this.parseIntOrDefault(titleRaw, DEFAULTS.titleMaxLen, 'title_max_len', 1, 300);
+    const descMaxItems = this.parseIntOrDefault(itemsRaw, DEFAULTS.descMaxItems, 'desc_max_items', 1, 50);
+    const descMaxWordsPerItem = this.parseIntOrDefault(wordsPerItemRaw, DEFAULTS.descMaxWordsPerItem, 'desc_max_words_per_item', 1, 100);
+    const descMaxTotalWords = this.parseIntOrDefault(totalWordsRaw, DEFAULTS.descMaxTotalWords, 'desc_max_total_words', 1, 2000);
+
+    const allowedEmojis = (emojisRaw || DEFAULTS.allowedEmojis.join(','))
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (allowedEmojis.length === 0) {
+      core.warning('[PR][limits] allowed_emojis is empty; using defaults');
+    }
+
+    return {
+      titleMaxLen,
+      descMaxItems,
+      descMaxWordsPerItem,
+      descMaxTotalWords,
+      allowedEmojis: allowedEmojis.length > 0 ? allowedEmojis : [...DEFAULTS.allowedEmojis],
+    };
   }
 
 
@@ -230,7 +287,7 @@ class PullRequestUpdater {
 
     const prefix = `${type}${scope ? `(${scope})` : ''}: `;
     // Enforce Conventional Commits guidance (<= 72 chars total)
-    const allowedSubjectLen = Math.max(0, PullRequestUpdater.MAX_TITLE_LENGTH - prefix.length);
+    const allowedSubjectLen = Math.max(0, this.limits.titleMaxLen - prefix.length);
     let finalSubject = bareSubject.length > allowedSubjectLen ? this.shortenSubject(bareSubject, allowedSubjectLen) : bareSubject;
     finalSubject = finalSubject.replace(/[\.!?]+$/g, '');
     const finalTitle = `${prefix}${finalSubject}`;
@@ -291,7 +348,7 @@ class PullRequestUpdater {
       core.info('[PR] calling AI to generate title and description');
       const currentTitle = prCtx.title || '';
       //const diffForPrompt = diffOutput.length > 50000 ? this.buildDiffSummary(changedFiles, diffOutput) : diffOutput;
-      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator });
+      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, limits: this.limits });
       core.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
       const preview = (content.description || '').slice(0, 400);
       core.info(`[PR] AI description preview:\n${preview}${content.description.length > 400 ? '...' : ''}`);

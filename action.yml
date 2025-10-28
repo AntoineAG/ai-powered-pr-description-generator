@@ -33,6 +33,26 @@ inputs:
     description: 'Whether to also update the PR title using AI.'
     required: false
     default: 'false'
+  title_max_len:
+    description: 'Maximum PR title length (characters).'
+    required: false
+    default: '120'
+  desc_max_items:
+    description: 'Maximum number of items in the description list.'
+    required: false
+    default: '5'
+  desc_max_words_per_item:
+    description: 'Maximum words per list item in the description.'
+    required: false
+    default: '25'
+  desc_max_total_words:
+    description: 'Maximum total words in the description.'
+    required: false
+    default: '300'
+  allowed_emojis:
+    description: 'Comma-separated emojis allowed in description list.'
+    required: false
+    default: '🚀,🎉,👍,👏,🔥'
 outputs:
   description:
     description: 'The AI-generated description for the pull request, providing context and details for reviewers.'

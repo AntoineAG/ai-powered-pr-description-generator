@@ -1,18 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DESC_MAX_WORDS = exports.DESC_ITEM_MAX_WORDS = exports.DESC_MAX_ITEMS = exports.ALLOWED_EMOJIS = exports.PROMPT_PREVIEW_LIMIT = void 0;
+exports.PROMPT_PREVIEW_LIMIT = void 0;
 exports.previewText = previewText;
 exports.buildUserPromptText = buildUserPromptText;
 exports.buildContinuationParts = buildContinuationParts;
 exports.buildGenerateRequest = buildGenerateRequest;
 exports.buildUnifiedPRPrompt = buildUnifiedPRPrompt;
-const json_config_1 = require("./json.config");
 const schema_1 = require("../json/schema");
+const json_config_1 = require("./json.config");
 exports.PROMPT_PREVIEW_LIMIT = 2000;
-exports.ALLOWED_EMOJIS = '🚀 🎉 👍 👏 🔥';
-exports.DESC_MAX_ITEMS = 5;
-exports.DESC_ITEM_MAX_WORDS = 12;
-exports.DESC_MAX_WORDS = 180;
 function previewText(text, limit = exports.PROMPT_PREVIEW_LIMIT) {
     if (!text)
         return '';
@@ -36,7 +32,7 @@ function buildGenerateRequest(params) {
 }
 /** Builds a unified prompt for PR title + description in strict JSON mode. */
 function buildUnifiedPRPrompt(params) {
-    const { diff, currentTitle, creator } = params;
+    const { diff, currentTitle, creator, limits } = params;
     const lines = [
         'You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.',
         '',
@@ -56,17 +52,17 @@ function buildUnifiedPRPrompt(params) {
         'Title rules:',
         '- Write in Conventional Commit format: type(scope): subject.',
         '- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.',
-        '- 6–12 words; maximum 72 characters.',
+        `- 6–12 words; maximum ${limits.titleMaxLen} characters.`,
         '- If a current title exists, improve it slightly if useful.',
         '',
         'Description rules:',
-        '- Markdown format. Begin with a subtitle: "## What this PR does?"',
+        '- Markdown format. Begin with a subtitle: "## What this PR does?\n"',
         '- Provide a simple description of the changes.',
         '- Numbered list of key changes. Do not paste the raw diff.',
         '- Keep it simple and reviewer-friendly.',
         '- Avoid code snippets or images.',
-        `- Add some fun with emojis from [${exports.ALLOWED_EMOJIS}] only: at most one emoji per item, and at most 3 total.`,
-        `- Use max ${exports.DESC_MAX_ITEMS} items; each ≤ ${exports.DESC_ITEM_MAX_WORDS} words; total ≤ ${exports.DESC_MAX_WORDS} words.`,
+        `- Add some fun with emojis from [${(limits.allowedEmojis || []).join(' ')}] only: at most one emoji per item, and at most 3 total.`,
+        `- Use max ${limits.descMaxItems} items; each ≤ ${limits.descMaxWordsPerItem} words; total ≤ ${limits.descMaxTotalWords} words.`,
     ];
     if (creator)
         lines.push(`- Thank **${creator}** for the contribution! 🎉`);

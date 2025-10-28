@@ -19730,10 +19730,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
     exports2.error = error3;
-    function warning2(message, properties = {}) {
+    function warning3(message, properties = {}) {
       (0, command_1.issueCommand)("warning", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
-    exports2.warning = warning2;
+    exports2.warning = warning3;
     function notice(message, properties = {}) {
       (0, command_1.issueCommand)("notice", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -25024,10 +25024,6 @@ function jsonModeConfig(params) {
 
 // src/core/prompt/prompt.builder.ts
 var PROMPT_PREVIEW_LIMIT = 2e3;
-var ALLOWED_EMOJIS = "\u{1F680} \u{1F389} \u{1F44D} \u{1F44F} \u{1F525}";
-var DESC_MAX_ITEMS = 5;
-var DESC_ITEM_MAX_WORDS = 25;
-var DESC_MAX_WORDS = 300;
 function previewText(text, limit = PROMPT_PREVIEW_LIMIT) {
   if (!text) return "";
   return text.length > limit ? `${text.slice(0, limit)}[...]` : text;
@@ -25044,7 +25040,7 @@ function buildGenerateRequest(params) {
   };
 }
 function buildUnifiedPRPrompt(params) {
-  const { diff, currentTitle, creator } = params;
+  const { diff, currentTitle, creator, limits } = params;
   const lines = [
     "You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.",
     "",
@@ -25064,7 +25060,7 @@ function buildUnifiedPRPrompt(params) {
     "Title rules:",
     "- Write in Conventional Commit format: type(scope): subject.",
     "- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.",
-    "- 6\u201312 words; maximum 72 characters.",
+    `- 6\u201312 words; maximum ${limits.titleMaxLen} characters.`,
     "- If a current title exists, improve it slightly if useful.",
     "",
     "Description rules:",
@@ -25073,8 +25069,8 @@ function buildUnifiedPRPrompt(params) {
     "- Numbered list of key changes. Do not paste the raw diff.",
     "- Keep it simple and reviewer-friendly.",
     "- Avoid code snippets or images.",
-    `- Add some fun with emojis from [${ALLOWED_EMOJIS}] only: at most one emoji per item, and at most 3 total.`,
-    `- Use max ${DESC_MAX_ITEMS} items; each \u2264 ${DESC_ITEM_MAX_WORDS} words; total \u2264 ${DESC_MAX_WORDS} words.`
+    `- Add some fun with emojis from [${(limits.allowedEmojis || []).join(" ")}] only: at most one emoji per item, and at most ${limits.descMaxItems} total.`,
+    `- Use max ${limits.descMaxItems} items; each \u2264 ${limits.descMaxWordsPerItem} words; total \u2264 ${limits.descMaxTotalWords} words.`
   ];
   if (creator) lines.push(`- Thank **${creator}** for the contribution! \u{1F389}`);
   lines.push("", "Context:");
@@ -25182,7 +25178,7 @@ var GeminiAIHelper = class _GeminiAIHelper {
     try {
       const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
       const supportsSystem = _GeminiAIHelper.supportsSystemInstruction(modelName);
-      const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator });
+      const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, limits: params?.limits });
       const promptPreview = previewText(unifiedPrompt, PROMPT_PREVIEW_LIMIT);
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Request`);
@@ -25261,7 +25257,7 @@ ${text}`);
         const retryOutcome3 = await generateWithRetry(
           async (activeModelName) => {
             const model = this.cache.getOrBuild(activeModelName);
-            const contPayload = this.buildTailContinuationRequest(partialDescUnescaped, temperature, tailMax);
+            const contPayload = this.buildTailContinuationRequest(partialDescUnescaped, temperature, tailMax, params?.limits);
             return model.generateContent(contPayload);
           },
           { logger: this.logger, provider: "Gemini", initialModel: retryOutcome.modelUsed, retry: this.config.retry }
@@ -25365,7 +25361,7 @@ ${contText}`);
     out = out.replace(/\\t/g, "	");
     return out;
   }
-  buildTailContinuationRequest(prefix, temperature, maxOutputTokens) {
+  buildTailContinuationRequest(prefix, temperature, maxOutputTokens, limits) {
     const excerpt = prefix.length > DESC_EXCERPT_CHARS ? prefix.slice(-DESC_EXCERPT_CHARS) : prefix;
     const tailSchema = {
       type: SchemaType.OBJECT,
@@ -25385,7 +25381,7 @@ ${contText}`);
       "- Keep the same style and structure (continue the Markdown list if it was started).",
       '- Do not re-emit the "title".',
       "- No code fences, no commentary.",
-      "- Stay within the original limits: max 5 items, each \u2264 12 words, total \u2264 180 words."
+      `- Stay within the original limits: max ${limits?.descMaxItems ?? 5} items, each \u2264 ${limits?.descMaxWordsPerItem ?? 25} words, total \u2264 ${limits?.descMaxTotalWords ?? 300} words.`
     ].join("\n");
     const contextMsg = "Here is the last " + String(DESC_EXCERPT_CHARS) + " characters of the description you already produced:\n" + excerpt;
     return {
@@ -25477,7 +25473,7 @@ var OpenAIHelper = class {
   }
   async generatePullRequestContent(diffOutput, params) {
     const { model, temperature, systemText } = this.config;
-    const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator });
+    const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, limits: params?.limits });
     const promptPreview = previewText(unifiedPrompt, PROMPT_PREVIEW_LIMIT);
     try {
       this.logger.info(`[AI][OpenAI] ::group::Request`);
@@ -25704,13 +25700,7 @@ var GitHelper = class {
 };
 
 // src/features/pull-requests/pull-request-updater.ts
-var PullRequestUpdater = class _PullRequestUpdater {
-  static {
-    this.MAX_TITLE_LENGTH = 72;
-  }
-  static {
-    this.LARGE_DIFF_THRESHOLD = 5e4;
-  }
+var PullRequestUpdater = class {
   constructor() {
     this.gitHelper = new GitHelper((0, import_core.getInput)("ignores"));
     this.context = import_github.context;
@@ -25723,6 +25713,53 @@ var PullRequestUpdater = class _PullRequestUpdater {
     const githubToken = (0, import_core.getInput)("github_token", { required: true }).trim();
     this.octokit = (0, import_github.getOctokit)(githubToken);
     this.updateTitle = ((0, import_core.getInput)("update_title") || "").toLowerCase() === "true";
+    this.limits = this.readPromptLimitsFromInputs();
+    core3.info(`[PR] limits ${JSON.stringify(this.limits)}`);
+  }
+  clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+  parseIntOrDefault(raw, fallback, nameForLog, min, max) {
+    const s = (raw || "").trim();
+    const v = Number.parseInt(s, 10);
+    if (!Number.isFinite(v)) {
+      core3.warning(`[PR][limits] ${nameForLog} invalid ('${raw ?? ""}'); using default ${fallback}`);
+      return fallback;
+    }
+    const clamped = this.clamp(v, min, max);
+    if (clamped !== v) {
+      core3.warning(`[PR][limits] ${nameForLog} out of range (${v}); clamped to ${clamped}`);
+    }
+    return clamped;
+  }
+  readPromptLimitsFromInputs() {
+    const DEFAULTS = {
+      titleMaxLen: 120,
+      descMaxItems: 5,
+      descMaxWordsPerItem: 25,
+      descMaxTotalWords: 300,
+      allowedEmojis: ["\u{1F680}", "\u{1F389}", "\u{1F44D}", "\u{1F44F}", "\u{1F525}"]
+    };
+    const titleRaw = (0, import_core.getInput)("title_max_len");
+    const itemsRaw = (0, import_core.getInput)("desc_max_items");
+    const wordsPerItemRaw = (0, import_core.getInput)("desc_max_words_per_item");
+    const totalWordsRaw = (0, import_core.getInput)("desc_max_total_words");
+    const emojisRaw = (0, import_core.getInput)("allowed_emojis");
+    const titleMaxLen = this.parseIntOrDefault(titleRaw, DEFAULTS.titleMaxLen, "title_max_len", 1, 300);
+    const descMaxItems = this.parseIntOrDefault(itemsRaw, DEFAULTS.descMaxItems, "desc_max_items", 1, 50);
+    const descMaxWordsPerItem = this.parseIntOrDefault(wordsPerItemRaw, DEFAULTS.descMaxWordsPerItem, "desc_max_words_per_item", 1, 100);
+    const descMaxTotalWords = this.parseIntOrDefault(totalWordsRaw, DEFAULTS.descMaxTotalWords, "desc_max_total_words", 1, 2e3);
+    const allowedEmojis = (emojisRaw || DEFAULTS.allowedEmojis.join(",")).split(",").map((s) => s.trim()).filter(Boolean);
+    if (allowedEmojis.length === 0) {
+      core3.warning("[PR][limits] allowed_emojis is empty; using defaults");
+    }
+    return {
+      titleMaxLen,
+      descMaxItems,
+      descMaxWordsPerItem,
+      descMaxTotalWords,
+      allowedEmojis: allowedEmojis.length > 0 ? allowedEmojis : [...DEFAULTS.allowedEmojis]
+    };
   }
   parseConventionalCommit(title) {
     const re = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(?:\(([^)]+)\))?:\s*(.+)$/i;
@@ -25941,7 +25978,7 @@ var PullRequestUpdater = class _PullRequestUpdater {
     bareSubject = bareSubject.replace(/\s*#\d+\s*$/g, "").trim();
     bareSubject = this.toImperativeWithLog(bareSubject);
     const prefix = `${type}${scope ? `(${scope})` : ""}: `;
-    const allowedSubjectLen = Math.max(0, _PullRequestUpdater.MAX_TITLE_LENGTH - prefix.length);
+    const allowedSubjectLen = Math.max(0, this.limits.titleMaxLen - prefix.length);
     let finalSubject = bareSubject.length > allowedSubjectLen ? this.shortenSubject(bareSubject, allowedSubjectLen) : bareSubject;
     finalSubject = finalSubject.replace(/[\.!?]+$/g, "");
     const finalTitle = `${prefix}${finalSubject}`;
@@ -25988,7 +26025,7 @@ var PullRequestUpdater = class _PullRequestUpdater {
       core3.startGroup("AI Generation");
       core3.info("[PR] calling AI to generate title and description");
       const currentTitle = prCtx.title || "";
-      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator });
+      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, limits: this.limits });
       core3.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
       const preview = (content.description || "").slice(0, 400);
       core3.info(`[PR] AI description preview:

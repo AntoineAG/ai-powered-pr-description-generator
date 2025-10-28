@@ -1,7 +1,7 @@
 import { buildUsageDiagnostics } from '../../core/diagnostics/usage-diagnostics';
 import { AIError } from '../../core/errors/ai.error';
-import { PROMPT_PREVIEW_LIMIT, previewText, buildUnifiedPRPrompt } from '../../core/prompt/prompt.builder';
-import { AIHelperInterface, Logger, OpenAIConfig, PullRequestContentResult, GeneratePRParams } from '../../core/types';
+import { PROMPT_PREVIEW_LIMIT, buildUnifiedPRPrompt, previewText } from '../../core/prompt/prompt.builder';
+import { AIHelperInterface, GeneratePRParams, Logger, OpenAIConfig, PullRequestContentResult } from '../../core/types';
 import { generateWithRetry } from '../../core/utils/retry';
 
 class OpenAIHelper implements AIHelperInterface {
@@ -15,7 +15,7 @@ class OpenAIHelper implements AIHelperInterface {
 
   async generatePullRequestContent(diffOutput: string, params?: GeneratePRParams): Promise<PullRequestContentResult> {
     const { model, temperature, systemText } = this.config;
-    const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator });
+    const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, limits: params?.limits! });
     const promptPreview = previewText(unifiedPrompt, PROMPT_PREVIEW_LIMIT);
     try {
       this.logger.info(`[AI][OpenAI] ::group::Request`);
