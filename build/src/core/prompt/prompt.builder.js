@@ -1,13 +1,18 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PROMPT_PREVIEW_LIMIT = void 0;
+exports.DESC_MAX_WORDS = exports.DESC_ITEM_MAX_WORDS = exports.DESC_MAX_ITEMS = exports.ALLOWED_EMOJIS = exports.PROMPT_PREVIEW_LIMIT = void 0;
 exports.previewText = previewText;
 exports.buildUserPromptText = buildUserPromptText;
 exports.buildContinuationParts = buildContinuationParts;
 exports.buildGenerateRequest = buildGenerateRequest;
 exports.buildUnifiedPRPrompt = buildUnifiedPRPrompt;
-const generative_ai_1 = require("@google/generative-ai");
+const json_config_1 = require("./json.config");
+const schema_1 = require("../json/schema");
 exports.PROMPT_PREVIEW_LIMIT = 2000;
+exports.ALLOWED_EMOJIS = '🚀 🎉 👍 👏 🔥';
+exports.DESC_MAX_ITEMS = 5;
+exports.DESC_ITEM_MAX_WORDS = 12;
+exports.DESC_MAX_WORDS = 180;
 function previewText(text, limit = exports.PROMPT_PREVIEW_LIMIT) {
     if (!text)
         return '';
@@ -24,71 +29,50 @@ function buildContinuationParts(previousOutput, prompt) {
     ];
 }
 function buildGenerateRequest(params) {
-    // Enforce JSON mode with an explicit schema for the unified object
-    const schema = {
-        type: generative_ai_1.SchemaType.OBJECT,
-        properties: {
-            title: {
-                type: generative_ai_1.SchemaType.OBJECT,
-                properties: {
-                    subject: { type: generative_ai_1.SchemaType.STRING },
-                    type: { type: generative_ai_1.SchemaType.STRING, nullable: true },
-                    scope: { type: generative_ai_1.SchemaType.STRING, nullable: true },
-                    conventional: { type: generative_ai_1.SchemaType.STRING },
-                },
-                required: ['subject', 'conventional'],
-            },
-            description: { type: generative_ai_1.SchemaType.STRING },
-        },
-        required: ['title', 'description'],
-    };
     return {
         contents: [{ role: 'user', parts: [{ text: params.userText }] }],
-        generationConfig: {
-            temperature: params.temperature,
-            maxOutputTokens: params.maxOutputTokens,
-            responseMimeType: 'application/json',
-            responseSchema: schema,
-        },
+        generationConfig: (0, json_config_1.jsonModeConfig)({ schema: schema_1.UnifiedPRSchema, temperature: params.temperature, maxOutputTokens: params.maxOutputTokens }),
     };
 }
-/**
- * Builds a unified prompt asking the model to produce both a PR title and description
- * in a strict JSON format. The prompt merges previous title/description guidance
- * while remaining provider-agnostic.
- */
+/** Builds a unified prompt for PR title + description in strict JSON mode. */
 function buildUnifiedPRPrompt(params) {
     const { diff, currentTitle, creator } = params;
-    const allowedEmojis = '🚀 🎉 👍 👏 🔥';
-    return (`You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.\n\n` +
-        `Output format:\n` +
-        `- Output STRICT JSON only (no code fences, no commentary).\n` +
-        `- Fields:\n` +
-        `  {\n` +
-        `    "title": {\n` +
-        `      "subject": string,\n` +
-        `      "type": string | null,\n` +
-        `      "scope": string | null,\n` +
-        `      "conventional": string\n` +
-        `    },\n` +
-        `    "description": string\n` +
-        `  }\n\n` +
-        `Title rules:\n` +
-        `- Write in Conventional Commit format: type(scope): subject.\n` +
-        `- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.\n` +
-        `- 6–12 words; maximum 72 characters.\n` +
-        `- If a current title exists, improve it slightly if useful.\n\n` +
-        `Description rules:\n` +
-        `- Markdown format. Begin with a subtitle: "## What this PR does?"\n` +
-        `- Provide a simple description of the changes.\n` +
-        `- Numbered list of key changes. Do not paste the raw diff.\n` +
-        `- Keep it simple and reviewer-friendly.\n` +
-        `- Avoid code snippets or images.\n` +
-        `- Add some fun with emojis from [${allowedEmojis}] only: at most one emoji per item, and at most 3 total.\n` +
-        `- Use max 5 items; each ≤ 12 words; total ≤ 180 words.\n` +
-        (creator ? `- Thank **${creator}** for the contribution! 🎉\n` : '') +
-        `\n` +
-        `Context:\n` +
-        (currentTitle ? `Current title: ${currentTitle}\n` : '') +
-        `Diff:\n${diff}`);
+    const lines = [
+        'You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.',
+        '',
+        'Output format:',
+        '- Output STRICT JSON only (no code fences, no commentary).',
+        '- Fields:',
+        '  {',
+        '    "title": {',
+        '      "subject": string,',
+        '      "type": string | null,',
+        '      "scope": string | null,',
+        '      "conventional": string',
+        '    },',
+        '    "description": string',
+        '  }',
+        '',
+        'Title rules:',
+        '- Write in Conventional Commit format: type(scope): subject.',
+        '- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.',
+        '- 6–12 words; maximum 72 characters.',
+        '- If a current title exists, improve it slightly if useful.',
+        '',
+        'Description rules:',
+        '- Markdown format. Begin with a subtitle: "## What this PR does?"',
+        '- Provide a simple description of the changes.',
+        '- Numbered list of key changes. Do not paste the raw diff.',
+        '- Keep it simple and reviewer-friendly.',
+        '- Avoid code snippets or images.',
+        `- Add some fun with emojis from [${exports.ALLOWED_EMOJIS}] only: at most one emoji per item, and at most 3 total.`,
+        `- Use max ${exports.DESC_MAX_ITEMS} items; each ≤ ${exports.DESC_ITEM_MAX_WORDS} words; total ≤ ${exports.DESC_MAX_WORDS} words.`,
+    ];
+    if (creator)
+        lines.push(`- Thank **${creator}** for the contribution! 🎉`);
+    lines.push('', 'Context:');
+    if (currentTitle)
+        lines.push(`Current title: ${currentTitle}`);
+    lines.push(`Diff:\n${diff}`);
+    return lines.join('\n');
 }

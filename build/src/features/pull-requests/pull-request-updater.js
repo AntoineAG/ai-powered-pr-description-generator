@@ -69,12 +69,11 @@ class PullRequestUpdater {
     }
     parseConventionalCommitWithLog(title) {
         const parsed = this.parseConventionalCommit(title);
-        console.log('[Title] parse', { input: title, parsed });
+        core.debug(`[Title] parse ${JSON.stringify({ input: title, parsed })}`);
         return parsed;
     }
     /**
-     * Picks a scope from the changed files, preferring a monorepo scope if changes span many areas.
-     */
+     * Picks a scope from the changed files, preferring a monorepo scope if changes span many areas.   */
     chooseScopeFromFilesWithMonorepo(files) {
         if (!files || files.length === 0)
             return undefined;
@@ -128,12 +127,12 @@ class PullRequestUpdater {
         const total = files.length;
         const manyAreas = Object.keys(candidates).length > 3 || (hasApps && hasPackages) || (hasBackend && hasFrontend);
         if (bestCount / total < 0.5 || manyAreas || hasMonorepoFiles) {
-            console.log('[Title] scope -> monorepo', { total, best, bestCount, candidates, hasApps, hasPackages, hasBackend, hasFrontend, hasMonorepoFiles });
+            core.debug(`[Title] scope -> monorepo ${JSON.stringify({ total, best, bestCount, candidates, hasApps, hasPackages, hasBackend, hasFrontend, hasMonorepoFiles })}`);
             return 'monorepo';
         }
         if (best === 'root')
             return 'repo';
-        console.log('[Title] scope -> best', { scope: best, total, bestCount, candidates });
+        core.debug(`[Title] scope -> best ${JSON.stringify({ scope: best, total, bestCount, candidates })}`);
         return best;
     }
     /**
@@ -174,7 +173,7 @@ class PullRequestUpdater {
     toImperativeWithLog(subject) {
         const result = this.toImperative(subject);
         if (result !== subject) {
-            console.log('[Title] imperative', { before: subject, after: result });
+            core.debug(`[Title] imperative ${JSON.stringify({ before: subject, after: result })}`);
         }
         return result;
     }
@@ -193,7 +192,7 @@ class PullRequestUpdater {
         const isCodeFile = (f) => /(\.ts$|\.tsx$|\.js$|\.jsx$|\.py$|\.go$|\.rb$|\.rs$|\.java$|\.php$)/i.test(f);
         const some = (pred) => files.some(pred);
         const scores = { feat: 0, fix: 0, docs: 0, style: 0, refactor: 0, perf: 0, test: 0, build: 0, ci: 0, chore: 0 };
-        const add = (k, n, reason) => { scores[k] += n; console.log(`[Title] score +${n} => ${k} :: ${reason}`); };
+        const add = (k, n, reason) => { scores[k] += n; core.debug(`[Title] score +${n} => ${k} :: ${reason}`); };
         if (some(isCodeFile))
             add('feat', 2, 'code changes present');
         if (some(isDocsFile))
@@ -230,12 +229,12 @@ class PullRequestUpdater {
             }
         }
         if (bestType === 'fix' && (monorepoSignals || addedFileSignals >= 3 || scores['feat'] >= scores['fix'] - 1)) {
-            console.log('[Title] adjust type: fix -> feat due to broader signals');
+            core.debug('[Title] adjust type: fix -> feat due to broader signals');
             bestType = 'feat';
         }
         if (bestType === 'chore' && some(isCodeFile))
             bestType = 'feat';
-        console.log('[Title] infer (scored) -> result', { bestType, scores });
+        core.debug(`[Title] infer (scored) -> result ${JSON.stringify({ bestType, scores })}`);
         return bestType;
     }
     /**
@@ -247,7 +246,7 @@ class PullRequestUpdater {
         let type = parsed.type;
         let scope = parsed.scope;
         let bareSubject = parsed.type ? parsed.subject : subject;
-        console.log('[Title] format -> initial', { subject, parsed, currentTitle });
+        core.debug(`[Title] format -> initial ${JSON.stringify({ subject, parsed, currentTitle })}`);
         // Determine a recommended type/scope from local heuristics
         const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
         const recommendedScope = this.chooseScopeFromFilesWithMonorepo(files);
@@ -275,12 +274,11 @@ class PullRequestUpdater {
         bareSubject = this.toImperativeWithLog(bareSubject);
         const prefix = `${type}${scope ? `(${scope})` : ''}: `;
         // Enforce Conventional Commits guidance (<= 72 chars total)
-        const MAX_TITLE_LENGTH = 72;
-        const allowedSubjectLen = Math.max(0, MAX_TITLE_LENGTH - prefix.length);
+        const allowedSubjectLen = Math.max(0, PullRequestUpdater.MAX_TITLE_LENGTH - prefix.length);
         let finalSubject = bareSubject.length > allowedSubjectLen ? this.shortenSubject(bareSubject, allowedSubjectLen) : bareSubject;
         finalSubject = finalSubject.replace(/[\.!?]+$/g, '');
         const finalTitle = `${prefix}${finalSubject}`;
-        console.log('[Title] format -> final', { type, scope, prefix, allowedSubjectLen, finalSubject, finalTitle });
+        core.debug(`[Title] format -> final ${JSON.stringify({ type, scope, prefix, allowedSubjectLen, finalSubject, finalTitle })}`);
         return finalTitle;
     }
     /**
@@ -331,14 +329,16 @@ class PullRequestUpdater {
             const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
             core.info(`[PR-Description] diff length=${diffOutput.length}`);
             const changedFiles = this.gitHelper.getChangedFiles(baseBranch, headBranch);
-            console.log('[Title] changed files', { count: changedFiles.length, files: changedFiles });
+            core.debug(`[Title] changed files ${JSON.stringify({ count: changedFiles.length, files: changedFiles })}`);
             core.endGroup();
             core.startGroup('AI Generation');
             core.info('[PR] calling AI to generate title and description');
             const currentTitle = prCtx.title || '';
-            const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator });
+            const diffForPrompt = diffOutput.length > 50000 ? this.buildDiffSummary(changedFiles, diffOutput) : diffOutput;
+            const content = await this.aiHelper.generatePullRequestContent(diffForPrompt, { currentTitle, creator });
             core.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
-            core.info(`[PR] AI description content:\n${content.description}`);
+            const preview = (content.description || '').slice(0, 400);
+            core.info(`[PR] AI description preview:\n${preview}${content.description.length > 400 ? '...' : ''}`);
             core.endGroup();
             // Compute final Conventional Commit title from AI output and local inference
             let generatedTitle;
@@ -448,5 +448,32 @@ class PullRequestUpdater {
         await this.octokit.rest.pulls.update(params);
         core.info("PR description updated successfully.");
     }
+    /** Builds a compact summary string for very large diffs to keep prompts small. */
+    buildDiffSummary(files, _diff) {
+        const total = files.length;
+        const topLevel = {};
+        for (const f of files) {
+            const top = (f.split('/').filter(Boolean)[0] || 'root');
+            topLevel[top] = (topLevel[top] || 0) + 1;
+        }
+        const topBuckets = Object.entries(topLevel)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(', ');
+        const maxList = 50;
+        const listed = files.slice(0, maxList).join('\n');
+        const more = total > maxList ? `\n... and ${total - maxList} more files` : '';
+        return [
+            'Summary of changes (diff omitted due to size):',
+            `Files changed: ${total}`,
+            `Top folders: ${topBuckets}`,
+            '',
+            'Changed file paths:',
+            listed + more,
+        ].join('\n');
+    }
 }
+PullRequestUpdater.MAX_TITLE_LENGTH = 72;
+PullRequestUpdater.LARGE_DIFF_THRESHOLD = 50000;
 exports.default = PullRequestUpdater;

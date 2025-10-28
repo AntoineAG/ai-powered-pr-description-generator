@@ -393,7 +393,7 @@ var require_tunnel = __commonJS({
         connectOptions.headers = connectOptions.headers || {};
         connectOptions.headers["Proxy-Authorization"] = "Basic " + new Buffer(connectOptions.proxyAuth).toString("base64");
       }
-      debug("making CONNECT request");
+      debug2("making CONNECT request");
       var connectReq = self.request(connectOptions);
       connectReq.useChunkedEncodingByDefault = false;
       connectReq.once("response", onResponse);
@@ -413,7 +413,7 @@ var require_tunnel = __commonJS({
         connectReq.removeAllListeners();
         socket.removeAllListeners();
         if (res.statusCode !== 200) {
-          debug(
+          debug2(
             "tunneling socket could not be established, statusCode=%d",
             res.statusCode
           );
@@ -425,7 +425,7 @@ var require_tunnel = __commonJS({
           return;
         }
         if (head.length > 0) {
-          debug("got illegal response body from proxy");
+          debug2("got illegal response body from proxy");
           socket.destroy();
           var error3 = new Error("got illegal response body from proxy");
           error3.code = "ECONNRESET";
@@ -433,13 +433,13 @@ var require_tunnel = __commonJS({
           self.removeSocket(placeholder);
           return;
         }
-        debug("tunneling connection has established");
+        debug2("tunneling connection has established");
         self.sockets[self.sockets.indexOf(placeholder)] = socket;
         return cb(socket);
       }
       function onError(cause) {
         connectReq.removeAllListeners();
-        debug(
+        debug2(
           "tunneling socket could not be established, cause=%s\n",
           cause.message,
           cause.stack
@@ -501,9 +501,9 @@ var require_tunnel = __commonJS({
       }
       return target;
     }
-    var debug;
+    var debug2;
     if (process.env.NODE_DEBUG && /\btunnel\b/.test(process.env.NODE_DEBUG)) {
-      debug = function() {
+      debug2 = function() {
         var args = Array.prototype.slice.call(arguments);
         if (typeof args[0] === "string") {
           args[0] = "TUNNEL: " + args[0];
@@ -513,10 +513,10 @@ var require_tunnel = __commonJS({
         console.error.apply(console, args);
       };
     } else {
-      debug = function() {
+      debug2 = function() {
       };
     }
-    exports2.debug = debug;
+    exports2.debug = debug2;
   }
 });
 
@@ -19722,10 +19722,10 @@ Support boolean input list: \`true | True | TRUE | false | False | FALSE\``);
       return process.env["RUNNER_DEBUG"] === "1";
     }
     exports2.isDebug = isDebug;
-    function debug(message) {
+    function debug2(message) {
       (0, command_1.issueCommand)("debug", {}, message);
     }
-    exports2.debug = debug;
+    exports2.debug = debug2;
     function error3(message, properties = {}) {
       (0, command_1.issueCommand)("error", (0, utils_1.toCommandProperties)(properties), message instanceof Error ? message.toString() : message);
     }
@@ -24988,8 +24988,46 @@ var AIError = class _AIError extends Error {
   }
 };
 
+// src/core/json/schema.ts
+var UnifiedPRSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    title: {
+      type: SchemaType.OBJECT,
+      properties: {
+        subject: { type: SchemaType.STRING },
+        type: { type: SchemaType.STRING, nullable: true },
+        scope: { type: SchemaType.STRING, nullable: true },
+        conventional: { type: SchemaType.STRING }
+      },
+      required: ["subject", "conventional"]
+    },
+    description: { type: SchemaType.STRING }
+  },
+  required: ["title", "description"]
+};
+var TailContinuationSchema = {
+  type: SchemaType.OBJECT,
+  properties: { description_tail: { type: SchemaType.STRING } },
+  required: ["description_tail"]
+};
+
+// src/core/prompt/json.config.ts
+function jsonModeConfig(params) {
+  return {
+    temperature: params.temperature,
+    maxOutputTokens: params.maxOutputTokens,
+    responseMimeType: "application/json",
+    responseSchema: params.schema
+  };
+}
+
 // src/core/prompt/prompt.builder.ts
 var PROMPT_PREVIEW_LIMIT = 2e3;
+var ALLOWED_EMOJIS = "\u{1F680} \u{1F389} \u{1F44D} \u{1F44F} \u{1F525}";
+var DESC_MAX_ITEMS = 5;
+var DESC_ITEM_MAX_WORDS = 25;
+var DESC_MAX_WORDS = 300;
 function previewText(text, limit = PROMPT_PREVIEW_LIMIT) {
   if (!text) return "";
   return text.length > limit ? `${text.slice(0, limit)}[...]` : text;
@@ -25000,71 +25038,50 @@ function buildUserPromptText(systemText, prompt, supportsSystemInstruction) {
 ${prompt}`;
 }
 function buildGenerateRequest(params) {
-  const schema = {
-    type: SchemaType.OBJECT,
-    properties: {
-      title: {
-        type: SchemaType.OBJECT,
-        properties: {
-          subject: { type: SchemaType.STRING },
-          type: { type: SchemaType.STRING, nullable: true },
-          scope: { type: SchemaType.STRING, nullable: true },
-          conventional: { type: SchemaType.STRING }
-        },
-        required: ["subject", "conventional"]
-      },
-      description: { type: SchemaType.STRING }
-    },
-    required: ["title", "description"]
-  };
   return {
     contents: [{ role: "user", parts: [{ text: params.userText }] }],
-    generationConfig: {
-      temperature: params.temperature,
-      maxOutputTokens: params.maxOutputTokens,
-      responseMimeType: "application/json",
-      responseSchema: schema
-    }
+    generationConfig: jsonModeConfig({ schema: UnifiedPRSchema, temperature: params.temperature, maxOutputTokens: params.maxOutputTokens })
   };
 }
 function buildUnifiedPRPrompt(params) {
   const { diff, currentTitle, creator } = params;
-  const allowedEmojis = "\u{1F680} \u{1F389} \u{1F44D} \u{1F44F} \u{1F525}";
-  return `You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.
-
-Output format:
-- Output STRICT JSON only (no code fences, no commentary).
-- Fields:
-  {
-    "title": {
-      "subject": string,
-      "type": string | null,
-      "scope": string | null,
-      "conventional": string
-    },
-    "description": string
-  }
-
-Title rules:
-- Write in Conventional Commit format: type(scope): subject.
-- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.
-- 6\u201312 words; maximum 72 characters.
-- If a current title exists, improve it slightly if useful.
-
-Description rules:
-- Markdown format. Begin with a subtitle: "## What this PR does?"
-- Provide a simple description of the changes.
-- Numbered list of key changes. Do not paste the raw diff.
-- Keep it simple and reviewer-friendly.
-- Avoid code snippets or images.
-- Add some fun with emojis from [${allowedEmojis}] only: at most one emoji per item, and at most 3 total.
-- Use max 5 items; each \u2264 12 words; total \u2264 180 words.
-` + (creator ? `- Thank **${creator}** for the contribution! \u{1F389}
-` : "") + `
-Context:
-` + (currentTitle ? `Current title: ${currentTitle}
-` : "") + `Diff:
-${diff}`;
+  const lines = [
+    "You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.",
+    "",
+    "Output format:",
+    "- Output STRICT JSON only (no code fences, no commentary).",
+    "- Fields:",
+    "  {",
+    '    "title": {',
+    '      "subject": string,',
+    '      "type": string | null,',
+    '      "scope": string | null,',
+    '      "conventional": string',
+    "    },",
+    '    "description": string',
+    "  }",
+    "",
+    "Title rules:",
+    "- Write in Conventional Commit format: type(scope): subject.",
+    "- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.",
+    "- 6\u201312 words; maximum 72 characters.",
+    "- If a current title exists, improve it slightly if useful.",
+    "",
+    "Description rules:",
+    '- Markdown format. Begin with a subtitle: "## What this PR does?\n"',
+    "- Provide a simple description of the changes.",
+    "- Numbered list of key changes. Do not paste the raw diff.",
+    "- Keep it simple and reviewer-friendly.",
+    "- Avoid code snippets or images.",
+    `- Add some fun with emojis from [${ALLOWED_EMOJIS}] only: at most one emoji per item, and at most 3 total.`,
+    `- Use max ${DESC_MAX_ITEMS} items; each \u2264 ${DESC_ITEM_MAX_WORDS} words; total \u2264 ${DESC_MAX_WORDS} words.`
+  ];
+  if (creator) lines.push(`- Thank **${creator}** for the contribution! \u{1F389}`);
+  lines.push("", "Context:");
+  if (currentTitle) lines.push(`Current title: ${currentTitle}`);
+  lines.push(`Diff:
+${diff}`);
+  return lines.join("\n");
 }
 
 // src/core/utils/cache.ts
@@ -25687,7 +25704,13 @@ var GitHelper = class {
 };
 
 // src/features/pull-requests/pull-request-updater.ts
-var PullRequestUpdater = class {
+var PullRequestUpdater = class _PullRequestUpdater {
+  static {
+    this.MAX_TITLE_LENGTH = 72;
+  }
+  static {
+    this.LARGE_DIFF_THRESHOLD = 5e4;
+  }
   constructor() {
     this.gitHelper = new GitHelper((0, import_core.getInput)("ignores"));
     this.context = import_github.context;
@@ -25711,7 +25734,7 @@ var PullRequestUpdater = class {
   }
   parseConventionalCommitWithLog(title) {
     const parsed = this.parseConventionalCommit(title);
-    console.log("[Title] parse", { input: title, parsed });
+    core3.debug(`[Title] parse ${JSON.stringify({ input: title, parsed })}`);
     return parsed;
   }
   /**
@@ -25768,11 +25791,11 @@ var PullRequestUpdater = class {
     const total = files.length;
     const manyAreas = Object.keys(candidates).length > 3 || hasApps && hasPackages || hasBackend && hasFrontend;
     if (bestCount / total < 0.5 || manyAreas || hasMonorepoFiles) {
-      console.log("[Title] scope -> monorepo", { total, best, bestCount, candidates, hasApps, hasPackages, hasBackend, hasFrontend, hasMonorepoFiles });
+      core3.debug(`[Title] scope -> monorepo ${JSON.stringify({ total, best, bestCount, candidates, hasApps, hasPackages, hasBackend, hasFrontend, hasMonorepoFiles })}`);
       return "monorepo";
     }
     if (best === "root") return "repo";
-    console.log("[Title] scope -> best", { scope: best, total, bestCount, candidates });
+    core3.debug(`[Title] scope -> best ${JSON.stringify({ scope: best, total, bestCount, candidates })}`);
     return best;
   }
   /**
@@ -25835,7 +25858,7 @@ var PullRequestUpdater = class {
   toImperativeWithLog(subject) {
     const result = this.toImperative(subject);
     if (result !== subject) {
-      console.log("[Title] imperative", { before: subject, after: result });
+      core3.debug(`[Title] imperative ${JSON.stringify({ before: subject, after: result })}`);
     }
     return result;
   }
@@ -25856,7 +25879,7 @@ var PullRequestUpdater = class {
     const scores = { feat: 0, fix: 0, docs: 0, style: 0, refactor: 0, perf: 0, test: 0, build: 0, ci: 0, chore: 0 };
     const add = (k, n, reason) => {
       scores[k] += n;
-      console.log(`[Title] score +${n} => ${k} :: ${reason}`);
+      core3.debug(`[Title] score +${n} => ${k} :: ${reason}`);
     };
     if (some(isCodeFile)) add("feat", 2, "code changes present");
     if (some(isDocsFile)) add("docs", 2, "docs files present");
@@ -25884,11 +25907,11 @@ var PullRequestUpdater = class {
       }
     }
     if (bestType === "fix" && (monorepoSignals || addedFileSignals >= 3 || scores["feat"] >= scores["fix"] - 1)) {
-      console.log("[Title] adjust type: fix -> feat due to broader signals");
+      core3.debug("[Title] adjust type: fix -> feat due to broader signals");
       bestType = "feat";
     }
     if (bestType === "chore" && some(isCodeFile)) bestType = "feat";
-    console.log("[Title] infer (scored) -> result", { bestType, scores });
+    core3.debug(`[Title] infer (scored) -> result ${JSON.stringify({ bestType, scores })}`);
     return bestType;
   }
   /**
@@ -25900,7 +25923,7 @@ var PullRequestUpdater = class {
     let type = parsed.type;
     let scope = parsed.scope;
     let bareSubject = parsed.type ? parsed.subject : subject;
-    console.log("[Title] format -> initial", { subject, parsed, currentTitle });
+    core3.debug(`[Title] format -> initial ${JSON.stringify({ subject, parsed, currentTitle })}`);
     const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
     const recommendedScope = this.chooseScopeFromFilesWithMonorepo(files);
     const allowedTypes = /* @__PURE__ */ new Set(["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore"]);
@@ -25918,12 +25941,11 @@ var PullRequestUpdater = class {
     bareSubject = bareSubject.replace(/\s*#\d+\s*$/g, "").trim();
     bareSubject = this.toImperativeWithLog(bareSubject);
     const prefix = `${type}${scope ? `(${scope})` : ""}: `;
-    const MAX_TITLE_LENGTH = 72;
-    const allowedSubjectLen = Math.max(0, MAX_TITLE_LENGTH - prefix.length);
+    const allowedSubjectLen = Math.max(0, _PullRequestUpdater.MAX_TITLE_LENGTH - prefix.length);
     let finalSubject = bareSubject.length > allowedSubjectLen ? this.shortenSubject(bareSubject, allowedSubjectLen) : bareSubject;
     finalSubject = finalSubject.replace(/[\.!?]+$/g, "");
     const finalTitle = `${prefix}${finalSubject}`;
-    console.log("[Title] format -> final", { type, scope, prefix, allowedSubjectLen, finalSubject, finalTitle });
+    core3.debug(`[Title] format -> final ${JSON.stringify({ type, scope, prefix, allowedSubjectLen, finalSubject, finalTitle })}`);
     return finalTitle;
   }
   /**
@@ -25961,15 +25983,16 @@ var PullRequestUpdater = class {
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
       core3.info(`[PR-Description] diff length=${diffOutput.length}`);
       const changedFiles = this.gitHelper.getChangedFiles(baseBranch, headBranch);
-      console.log("[Title] changed files", { count: changedFiles.length, files: changedFiles });
+      core3.debug(`[Title] changed files ${JSON.stringify({ count: changedFiles.length, files: changedFiles })}`);
       core3.endGroup();
       core3.startGroup("AI Generation");
       core3.info("[PR] calling AI to generate title and description");
       const currentTitle = prCtx.title || "";
       const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator });
       core3.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
-      core3.info(`[PR] AI description content:
-${content.description}`);
+      const preview = (content.description || "").slice(0, 400);
+      core3.info(`[PR] AI description preview:
+${preview}${content.description.length > 400 ? "..." : ""}`);
       core3.endGroup();
       let generatedTitle;
       const baseTitleForFormatting = (content.title || content.meta?.subject || "").trim();
@@ -26083,6 +26106,28 @@ ${currentDescription}`
     }
     await this.octokit.rest.pulls.update(params);
     core3.info("PR description updated successfully.");
+  }
+  /** Builds a compact summary string for very large diffs to keep prompts small. */
+  buildDiffSummary(files, _diff) {
+    const total = files.length;
+    const topLevel = {};
+    for (const f of files) {
+      const top = f.split("/").filter(Boolean)[0] || "root";
+      topLevel[top] = (topLevel[top] || 0) + 1;
+    }
+    const topBuckets = Object.entries(topLevel).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `${k}: ${v}`).join(", ");
+    const maxList = 50;
+    const listed = files.slice(0, maxList).join("\n");
+    const more = total > maxList ? `
+... and ${total - maxList} more files` : "";
+    return [
+      "Summary of changes (diff omitted due to size):",
+      `Files changed: ${total}`,
+      `Top folders: ${topBuckets}`,
+      "",
+      "Changed file paths:",
+      listed + more
+    ].join("\n");
   }
 };
 var pull_request_updater_default = PullRequestUpdater;

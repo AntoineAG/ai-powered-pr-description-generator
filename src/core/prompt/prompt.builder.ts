@@ -1,6 +1,12 @@
-import { Content, GenerateContentRequest, ObjectSchema, Part, SchemaType } from '@google/generative-ai';
+import { Content, GenerateContentRequest, Part } from '@google/generative-ai';
+import { UnifiedPRSchema } from '../json/schema';
+import { jsonModeConfig } from './json.config';
 
 export const PROMPT_PREVIEW_LIMIT = 2000;
+export const ALLOWED_EMOJIS = '🚀 🎉 👍 👏 🔥';
+export const DESC_MAX_ITEMS = 5;
+export const DESC_ITEM_MAX_WORDS = 25;
+export const DESC_MAX_WORDS = 300;
 
 export function previewText(text: string, limit: number = PROMPT_PREVIEW_LIMIT): string {
   if (!text) return '';
@@ -20,32 +26,9 @@ export function buildContinuationParts(previousOutput: string, prompt: string): 
 }
 
 export function buildGenerateRequest(params: { userText: string; temperature: number; maxOutputTokens: number }): GenerateContentRequest {
-  // Enforce JSON mode with an explicit schema for the unified object
-  const schema: ObjectSchema = {
-    type: SchemaType.OBJECT,
-    properties: {
-      title: {
-        type: SchemaType.OBJECT,
-        properties: {
-          subject: { type: SchemaType.STRING },
-          type: { type: SchemaType.STRING, nullable: true },
-          scope: { type: SchemaType.STRING, nullable: true },
-          conventional: { type: SchemaType.STRING },
-        },
-        required: ['subject', 'conventional'],
-      },
-      description: { type: SchemaType.STRING },
-    },
-    required: ['title', 'description'],
-  };
   return {
     contents: [ { role: 'user', parts: [{ text: params.userText }] } ],
-    generationConfig: {
-      temperature: params.temperature,
-      maxOutputTokens: params.maxOutputTokens,
-      responseMimeType: 'application/json',
-      responseSchema: schema,
-    },
+    generationConfig: jsonModeConfig({ schema: UnifiedPRSchema, temperature: params.temperature, maxOutputTokens: params.maxOutputTokens }),
   };
 }
 
@@ -55,45 +38,44 @@ export interface UnifiedPRPromptParams {
   creator?: string;
 }
 
-/**
- * Builds a unified prompt asking the model to produce both a PR title and description
- * in a strict JSON format. The prompt merges previous title/description guidance
- * while remaining provider-agnostic.
- */
+/** Builds a unified prompt for PR title + description in strict JSON mode. */
 export function buildUnifiedPRPrompt(params: UnifiedPRPromptParams): string {
   const { diff, currentTitle, creator } = params;
-  const allowedEmojis = '🚀 🎉 👍 👏 🔥';
-  return (
-    `You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.\n\n` +
-    `Output format:\n` +
-    `- Output STRICT JSON only (no code fences, no commentary).\n` +
-    `- Fields:\n` +
-    `  {\n` +
-    `    "title": {\n` +
-    `      "subject": string,\n` +
-    `      "type": string | null,\n` +
-    `      "scope": string | null,\n` +
-    `      "conventional": string\n` +
-    `    },\n` +
-    `    "description": string\n` +
-    `  }\n\n` +
-    `Title rules:\n` +
-    `- Write in Conventional Commit format: type(scope): subject.\n` +
-    `- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.\n` +
-    `- 6–12 words; maximum 72 characters.\n` +
-    `- If a current title exists, improve it slightly if useful.\n\n` +
-    `Description rules:\n` +
-    `- Markdown format. Begin with a subtitle: "## What this PR does?"\n` +
-    `- Provide a simple description of the changes.\n` +
-    `- Numbered list of key changes. Do not paste the raw diff.\n` +
-    `- Keep it simple and reviewer-friendly.\n` +
-    `- Avoid code snippets or images.\n` +
-    `- Add some fun with emojis from [${allowedEmojis}] only: at most one emoji per item, and at most 3 total.\n` +
-    `- Use max 5 items; each ≤ 12 words; total ≤ 180 words.\n` +
-    (creator ? `- Thank **${creator}** for the contribution! 🎉\n` : '') +
-    `\n` +
-    `Context:\n` +
-    (currentTitle ? `Current title: ${currentTitle}\n` : '') +
-    `Diff:\n${diff}`
-  );
+  const lines: string[] = [
+    'You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.',
+    '',
+    'Output format:',
+    '- Output STRICT JSON only (no code fences, no commentary).',
+    '- Fields:',
+    '  {',
+    '    "title": {',
+    '      "subject": string,',
+    '      "type": string | null,',
+    '      "scope": string | null,',
+    '      "conventional": string',
+    '    },',
+    '    "description": string',
+    '  }',
+    '',
+    'Title rules:',
+    '- Write in Conventional Commit format: type(scope): subject.',
+    '- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.',
+    '- 6–12 words; maximum 72 characters.',
+    '- If a current title exists, improve it slightly if useful.',
+    '',
+    'Description rules:',
+    '- Markdown format. Begin with a subtitle: "## What this PR does?\n"',
+    '- Provide a simple description of the changes.',
+    '- Numbered list of key changes. Do not paste the raw diff.',
+    '- Keep it simple and reviewer-friendly.',
+    '- Avoid code snippets or images.',
+    `- Add some fun with emojis from [${ALLOWED_EMOJIS}] only: at most one emoji per item, and at most 3 total.`,
+    `- Use max ${DESC_MAX_ITEMS} items; each ≤ ${DESC_ITEM_MAX_WORDS} words; total ≤ ${DESC_MAX_WORDS} words.`,
+  ];
+  if (creator) lines.push(`- Thank **${creator}** for the contribution! 🎉`);
+  lines.push('', 'Context:');
+  if (currentTitle) lines.push(`Current title: ${currentTitle}`);
+  lines.push(`Diff:\n${diff}`);
+  return lines.join('\n');
 }
+
