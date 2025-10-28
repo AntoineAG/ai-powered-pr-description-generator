@@ -1,8 +1,8 @@
-import { AIError } from './ai-error';
-import { PROMPT_PREVIEW_LIMIT, previewText } from './prompt-utils';
-import { generateWithRetry } from './retry-utils';
-import { AIHelperInterface, Logger, OpenAIConfig } from './types';
-import { buildUsageDiagnostics } from './usage-diagnostics';
+import { buildUsageDiagnostics } from '../../core/diagnostics/usage-diagnostics';
+import { AIError } from '../../core/errors/ai.error';
+import { PROMPT_PREVIEW_LIMIT, previewText } from '../../core/prompt/prompt.builder';
+import { AIHelperInterface, Logger, OpenAIConfig } from '../../core/types';
+import { generateWithRetry } from '../../core/utils/retry';
 
 class OpenAIHelper implements AIHelperInterface {
   private readonly config: OpenAIConfig;

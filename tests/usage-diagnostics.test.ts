@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert';
 import { test } from 'node:test';
-import { buildUsageDiagnostics } from '../src/ai/usage-diagnostics';
+import { buildUsageDiagnostics } from '../src/core/diagnostics/usage-diagnostics';
 
 test('usage diagnostics basic estimation', () => {
   const usage = { promptTokenCount: 10, candidatesTokenCount: 30, totalTokenCount: 40 };

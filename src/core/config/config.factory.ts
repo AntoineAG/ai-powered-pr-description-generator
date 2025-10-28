@@ -1,4 +1,4 @@
-import { AIHelperParams, GeminiConfig, OpenAIConfig, ProviderCommonConfig, RetryConfig } from './types';
+import { ProviderCommonConfig, RetryConfig } from '../types';
 
 export const DEFAULT_MAX_OUTPUT_TOKENS = 1536;
 export const MIN_MAX_OUTPUT_TOKENS = 768;
@@ -46,30 +46,4 @@ export function buildProviderCommonConfig(params: { model: string; temperature: 
   };
 }
 
-export function buildGeminiConfig(aiParams: AIHelperParams, options?: { systemText?: string }): GeminiConfig {
-  const providerDefaults = {
-    model: (aiParams.model || 'gemini-2.5-flash').trim(),
-    temperature: aiParams.temperature,
-    systemText: (options?.systemText || 'You are very good at reviewing code and can generate pull request descriptions.').trim(),
-  };
-  const common = buildProviderCommonConfig(providerDefaults);
-  return {
-    apiKey: aiParams.apiKey,
-    ...common,
-  };
-}
-
-export function buildOpenAIConfig(aiParams: AIHelperParams, options?: { systemText?: string; baseUrl?: string; modelLadder?: string[] }): OpenAIConfig {
-  const providerDefaults = {
-    model: (aiParams.model || 'gpt-4.1').trim(),
-    temperature: aiParams.temperature,
-    systemText: (options?.systemText || 'You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions.').trim(),
-  };
-  const common = buildProviderCommonConfig({ ...providerDefaults, retry: { modelLadder: options?.modelLadder } });
-  return {
-    apiKey: aiParams.apiKey,
-    baseUrl: options?.baseUrl,
-    ...common,
-  };
-}
-
+// Provider-specific config builders now live under src/providers/*/*.config.ts

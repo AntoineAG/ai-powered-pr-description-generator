@@ -23865,15 +23865,15 @@ var require_github = __commonJS({
   }
 });
 
-// src/pull-request-updater.ts
+// src/features/pull-requests/pull-request-updater.ts
 var core3 = __toESM(require_core());
 var import_core = __toESM(require_core());
 var import_github = __toESM(require_github());
 
-// src/ai/ai-helper-resolver.ts
+// src/core/resolver.ts
 var core = __toESM(require_core());
 
-// src/ai/config-utils.ts
+// src/core/config/config.factory.ts
 var DEFAULT_MAX_OUTPUT_TOKENS = 1536;
 var MIN_MAX_OUTPUT_TOKENS = 768;
 var DEFAULT_RETRY_CONFIG = {
@@ -23914,6 +23914,8 @@ function buildProviderCommonConfig(params) {
     retry: buildRetryConfigFromEnv(params.retry)
   };
 }
+
+// src/providers/gemini/gemini.config.ts
 function buildGeminiConfig(aiParams, options) {
   const providerDefaults = {
     model: (aiParams.model || "gemini-2.5-flash").trim(),
@@ -23926,6 +23928,8 @@ function buildGeminiConfig(aiParams, options) {
     ...common
   };
 }
+
+// src/providers/openai/openai.config.ts
 function buildOpenAIConfig(aiParams, options) {
   const providerDefaults = {
     model: (aiParams.model || "gpt-4.1").trim(),
@@ -24947,7 +24951,7 @@ var GoogleGenerativeAI = class {
   }
 };
 
-// src/ai/ai-error.ts
+// src/core/errors/ai.error.ts
 var AIError = class _AIError extends Error {
   constructor(message, meta, cause) {
     super(message);
@@ -24960,7 +24964,7 @@ var AIError = class _AIError extends Error {
   }
 };
 
-// src/ai/model-cache.ts
+// src/core/utils/cache.ts
 var ModelCache = class {
   constructor(builder) {
     this.builder = builder;
@@ -24975,7 +24979,7 @@ var ModelCache = class {
   }
 };
 
-// src/ai/prompt-utils.ts
+// src/core/prompt/prompt.builder.ts
 var PROMPT_PREVIEW_LIMIT = 2e3;
 function previewText(text, limit = PROMPT_PREVIEW_LIMIT) {
   if (!text) return "";
@@ -25000,7 +25004,7 @@ function buildGenerateRequest(params) {
   };
 }
 
-// src/ai/retry-utils.ts
+// src/core/utils/retry.ts
 var defaultRetryClassifier = {
   isRetryable: (e) => {
     const status = typeof e?.status === "number" ? e.status : void 0;
@@ -25057,7 +25061,7 @@ async function generateWithRetry(task, options, classifier = defaultRetryClassif
   throw new Error(`[AI][${provider}] Exhausted retry attempts after ${elapsed}ms`);
 }
 
-// src/ai/usage-diagnostics.ts
+// src/core/diagnostics/usage-diagnostics.ts
 function buildUsageDiagnostics(usage, text) {
   const num = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
   const u = usage || {};
@@ -25096,25 +25100,24 @@ function buildUsageDiagnostics(usage, text) {
   };
 }
 
-// src/ai/gemini-ai-helper.ts
-var GeminiAIHelper = class {
+// src/providers/gemini/gemini.helper.ts
+var GeminiAIHelper = class _GeminiAIHelper {
   constructor(params) {
     this.config = params.config;
     this.logger = params.logger;
-    const client = new GoogleGenerativeAI(this.config.apiKey);
+    this.client = params.client ?? new GoogleGenerativeAI(this.config.apiKey);
     this.cache = new ModelCache((name) => {
-      const supportsSystem = this.supportsSystemInstruction(name);
-      const modelParams = {
+      const supportsSystem = _GeminiAIHelper.supportsSystemInstruction(name);
+      return this.client.getGenerativeModel({
         model: name,
         ...supportsSystem ? { systemInstruction: this.config.systemText } : {}
-      };
-      return client.getGenerativeModel(modelParams);
+      });
     });
   }
   async createPullRequestDescription(_diffOutput, prompt) {
     try {
       const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
-      const supportsSystem = this.supportsSystemInstruction(modelName);
+      const supportsSystem = _GeminiAIHelper.supportsSystemInstruction(modelName);
       const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Request`);
@@ -25190,7 +25193,7 @@ ${more}`);
       throw AIError.wrap(`Gemini API Error: ${msg}`, { provider: "Gemini", statusCode: status });
     }
   }
-  supportsSystemInstruction(name) {
+  static supportsSystemInstruction(name) {
     return name.toLowerCase().startsWith("gemini-2");
   }
   concatCandidatePartsText(resp) {
@@ -25208,9 +25211,9 @@ ${more}`);
     return buf.join("").trim();
   }
 };
-var gemini_ai_helper_default = GeminiAIHelper;
+var gemini_helper_default = GeminiAIHelper;
 
-// src/ai/open-ai-helper.ts
+// src/providers/openai/openai.helper.ts
 var OpenAIHelper = class {
   constructor(params) {
     this.config = params.config;
@@ -25326,9 +25329,9 @@ ${more}`);
     }
   }
 };
-var open_ai_helper_default = OpenAIHelper;
+var openai_helper_default = OpenAIHelper;
 
-// src/ai/ai-helper-resolver.ts
+// src/core/resolver.ts
 var aiHelperResolver = (aiHelperParams) => {
   const { aiName, model, temperature } = aiHelperParams;
   core.info(`[AI] Resolver -> provider=${aiName}, model=${model}, temperature=${temperature}`);
@@ -25344,18 +25347,18 @@ var aiHelperResolver = (aiHelperParams) => {
     case "open-ai":
     case "openai": {
       const config = buildOpenAIConfig(aiHelperParams);
-      return new open_ai_helper_default({ config, logger });
+      return new openai_helper_default({ config, logger });
     }
     case "gemini":
     default: {
       const config = buildGeminiConfig(aiHelperParams);
-      return new gemini_ai_helper_default({ config, logger });
+      return new gemini_helper_default({ config, logger });
     }
   }
 };
-var ai_helper_resolver_default = aiHelperResolver;
+var resolver_default = aiHelperResolver;
 
-// src/git-helper.ts
+// src/integrations/github/git.helper.ts
 var core2 = __toESM(require_core());
 var import_child_process = require("child_process");
 var GitHelper = class {
@@ -25380,9 +25383,21 @@ var GitHelper = class {
     core2.info(`Filtered diff length: ${diffOutput.length}`);
     return diffOutput;
   }
+  getChangedFiles(baseBranch, headBranch) {
+    const defaultIgnoreFiles = [
+      ":!**/package-lock.json",
+      ":!**/dist/*"
+    ];
+    const ignoreFiles = this.ignores ? this.ignores.split(",").map((item) => `:!${item.trim()}`) : defaultIgnoreFiles;
+    const output = (0, import_child_process.execSync)(
+      `git diff --name-only origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(" ")}`,
+      { encoding: "utf8" }
+    );
+    return output.split("\n").map((s) => s.trim()).filter(Boolean);
+  }
 };
 
-// src/pull-request-updater.ts
+// src/features/pull-requests/pull-request-updater.ts
 var PullRequestUpdater = class {
   constructor() {
     this.gitHelper = new GitHelper((0, import_core.getInput)("ignores"));
@@ -25391,10 +25406,11 @@ var PullRequestUpdater = class {
     const model = ((0, import_core.getInput)("ai_model") || "").trim() || (aiName === "openai" ? "gpt-4.1" : "gemini-2.5-flash");
     const apiKey = (0, import_core.getInput)("api_key", { required: true }).trim();
     const temperature = Number.parseFloat((0, import_core.getInput)("temperature") || "0.8");
-    this.aiHelper = ai_helper_resolver_default({ apiKey, aiName, temperature, model });
+    this.aiHelper = resolver_default({ apiKey, aiName, temperature, model });
     core3.info(`[PR-Description] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
     const githubToken = (0, import_core.getInput)("github_token", { required: true }).trim();
     this.octokit = (0, import_github.getOctokit)(githubToken);
+    this.updateTitle = ((0, import_core.getInput)("update_title") || "").toLowerCase() === "true";
   }
   previewStr(text, max = 400) {
     try {
@@ -25421,6 +25437,313 @@ var PullRequestUpdater = class {
     Diff:
     ${diffOutput}`;
   }
+  generateTitlePrompt(diffOutput, currentTitle) {
+    return `You are helping write a precise, concise Pull Request title.
+
+Rules:
+- Output ONLY the title text, nothing else.
+- Use imperative mood, present tense.
+- 6-12 words, max 72 characters.
+- No emojis, no code fences, no quotes, no trailing punctuation.
+- Summarize the main changes from the diff. If the current title is already great, improve it slightly.
+
+Current title: ${currentTitle}
+
+Diff:
+${diffOutput}`;
+  }
+  sanitizeTitle(title) {
+    const cleaned = (title || "").replace(/^#+\s*/, "").replace(/^[`'"]+|[`'"]+$/g, "").trim().replace(/\s+/g, " ").replace(/[\.!?]+$/g, "");
+    return cleaned.length > 72 ? cleaned.slice(0, 72).trim() : cleaned;
+  }
+  parseConventionalCommit(title) {
+    const re = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(?:\(([^)]+)\))?:\s*(.+)$/i;
+    const m = title.match(re);
+    if (m) {
+      return { type: m[1].toLowerCase(), scope: m[2], subject: (m[3] || "").trim() };
+    }
+    return { subject: title.trim() };
+  }
+  parseConventionalCommitWithLog(title) {
+    const parsed = this.parseConventionalCommit(title);
+    console.log("[Title] parse", { input: title, parsed });
+    return parsed;
+  }
+  chooseScopeFromFiles(files) {
+    if (!files || files.length === 0) return void 0;
+    const candidates = {};
+    const bump = (k) => {
+      if (!k) return;
+      candidates[k] = (candidates[k] || 0) + 1;
+    };
+    for (const f of files) {
+      const parts = f.split("/").filter(Boolean);
+      if (parts[0] === ".github") {
+        bump("ci");
+        continue;
+      }
+      if (parts.length === 1) {
+        bump("root");
+        continue;
+      }
+      if (parts[0] === "apps" && parts[1]) {
+        bump(parts[1]);
+        continue;
+      }
+      if (parts[0] === "packages" && parts[1]) {
+        bump(parts[1]);
+        continue;
+      }
+      if (["backend", "frontend", "server", "client", "api", "web", "app"].includes(parts[0])) {
+        bump(parts[0]);
+        continue;
+      }
+      if (parts[0] === "src" && parts[1]) {
+        bump(parts[1]);
+        continue;
+      }
+      bump(parts[0]);
+    }
+    let best;
+    let bestCount = 0;
+    for (const [k, v] of Object.entries(candidates)) {
+      if (v > bestCount) {
+        best = k;
+        bestCount = v;
+      }
+    }
+    if (!best) return void 0;
+    const total = files.length;
+    if (bestCount / total < 0.5 || Object.keys(candidates).length > 3) {
+      return "monorepo";
+    }
+    if (best === "root") return "repo";
+    return best;
+  }
+  chooseScopeFromFilesWithMonorepo(files) {
+    if (!files || files.length === 0) return void 0;
+    const hasApps = files.some((f) => /^apps\//.test(f));
+    const hasPackages = files.some((f) => /^packages\//.test(f));
+    const hasBackend = files.some((f) => /(^|\/)backend(\/|$)/.test(f));
+    const hasFrontend = files.some((f) => /(^|\/)frontend(\/|$)/.test(f));
+    const hasMonorepoFiles = files.some((f) => /(^|\/)pnpm-workspace\.ya?ml$|(^|\/)turbo\.json$/.test(f));
+    const candidates = {};
+    const bump = (k) => {
+      if (!k) return;
+      candidates[k] = (candidates[k] || 0) + 1;
+    };
+    for (const f of files) {
+      const parts = f.split("/").filter(Boolean);
+      if (parts[0] === ".github") {
+        bump("ci");
+        continue;
+      }
+      if (parts.length === 1) {
+        bump("root");
+        continue;
+      }
+      if (parts[0] === "apps" && parts[1]) {
+        bump(parts[1]);
+        continue;
+      }
+      if (parts[0] === "packages" && parts[1]) {
+        bump(parts[1]);
+        continue;
+      }
+      if (["backend", "frontend", "server", "client", "api", "web", "app"].includes(parts[0])) {
+        bump(parts[0]);
+        continue;
+      }
+      if (parts[0] === "src" && parts[1]) {
+        bump(parts[1]);
+        continue;
+      }
+      bump(parts[0]);
+    }
+    let best;
+    let bestCount = 0;
+    for (const [k, v] of Object.entries(candidates)) {
+      if (v > bestCount) {
+        best = k;
+        bestCount = v;
+      }
+    }
+    if (!best) return void 0;
+    const total = files.length;
+    const manyAreas = Object.keys(candidates).length > 3 || hasApps && hasPackages || hasBackend && hasFrontend;
+    if (bestCount / total < 0.5 || manyAreas || hasMonorepoFiles) {
+      console.log("[Title] scope -> monorepo", { total, best, bestCount, candidates, hasApps, hasPackages, hasBackend, hasFrontend, hasMonorepoFiles });
+      return "monorepo";
+    }
+    if (best === "root") return "repo";
+    console.log("[Title] scope -> best", { scope: best, total, bestCount, candidates });
+    return best;
+  }
+  toImperative(subject) {
+    if (!subject) return subject;
+    let s = subject.trim().replace(/\s+/g, " ").replace(/[\.!?]+$/g, "");
+    const wordRe = /(^|:\s*|\()([A-Za-z][\w'-]*)/;
+    const m = s.match(wordRe);
+    if (!m) return s;
+    const startIdx = (m.index || 0) + m[1].length;
+    const word = m[2];
+    const lemmas = {
+      adds: "add",
+      added: "add",
+      adding: "add",
+      fixes: "fix",
+      fixed: "fix",
+      fixing: "fix",
+      updates: "update",
+      updated: "update",
+      updating: "update",
+      removes: "remove",
+      removed: "remove",
+      removing: "remove",
+      improves: "improve",
+      improved: "improve",
+      improving: "improve",
+      introduces: "introduce",
+      introduced: "introduce",
+      introducing: "introduce",
+      refactors: "refactor",
+      refactored: "refactor",
+      refactoring: "refactor",
+      migrates: "migrate",
+      migrated: "migrate",
+      migrating: "migrate",
+      renames: "rename",
+      renamed: "rename",
+      renaming: "rename",
+      optimizes: "optimize",
+      optimized: "optimize",
+      optimizing: "optimize",
+      uses: "use",
+      used: "use",
+      using: "use",
+      ensures: "ensure",
+      ensured: "ensure",
+      ensuring: "ensure"
+    };
+    const lower = word.toLowerCase();
+    const base = lemmas[lower] || lower;
+    s = s.slice(0, startIdx) + base + s.slice(startIdx + word.length);
+    return s;
+  }
+  toImperativeWithLog(subject) {
+    const result = this.toImperative(subject);
+    if (result !== subject) {
+      console.log("[Title] imperative", { before: subject, after: result });
+    }
+    return result;
+  }
+  inferCommitType(diffOutput, files, currentTitle, subject) {
+    const lowerAll = (s) => (s || "").toLowerCase();
+    const d = lowerAll(diffOutput);
+    const t = lowerAll(currentTitle + " " + subject);
+    const isDocsFile = (f) => /(^docs\/|\.md$|README\.[^/]*$)/i.test(f);
+    const isTestFile = (f) => /(\.test\.|\.spec\.|__tests__\/|^tests\/)/i.test(f);
+    const isCiFile = (f) => /(^\.github\/|^\.circleci\/|gitlab-ci\.yml$|azure-pipelines\.yml$)/i.test(f);
+    const isBuildFile = (f) => /(^Dockerfile$|docker-compose|^turbo\.json$|^pnpm-workspace\.ya?ml$|^package\.json$|^vite\.config|^webpack\.config|^rollup\.config|^tsconfig\.json$|babel|^Makefile$)/i.test(f);
+    const isStyleFile = (f) => /(\.css$|\.scss$|\.sass$|\.less$)/i.test(f);
+    const isCodeFile = (f) => /(\.ts$|\.tsx$|\.js$|\.jsx$|\.py$|\.go$|\.rb$|\.rs$|\.java$|\.php$)/i.test(f);
+    const every = (pred) => files.length > 0 && files.every(pred);
+    const some = (pred) => files.some(pred);
+    if (files.length > 0) {
+      if (every(isDocsFile)) return "docs";
+      if (every(isTestFile)) return "test";
+      if (every(isCiFile)) return "ci";
+      if (every(isBuildFile)) return "build";
+      if (every(isStyleFile)) return "style";
+    }
+    if (/\bfix(e[sd]|ing)?\b|\bbug\b|\berror\b|\bissue\b|\bcorrect\b/.test(d) || /\bfix\b/.test(t)) {
+      return "fix";
+    }
+    if (/\brefactor(ing|ed|s)?\b|\bcleanup\b|\brename\b|\brestructure\b/.test(d) || /\brefactor\b/.test(t)) {
+      return "refactor";
+    }
+    if (/\bperf(ormance)?\b|\boptimi[sz]e\b|\bfaster\b|\bspeed\b/.test(d + " " + t)) {
+      return "perf";
+    }
+    if (some(isCiFile) && !some(isCodeFile)) return "ci";
+    if (some(isBuildFile) && !some(isCodeFile)) return "build";
+    if (some(isDocsFile) && !some(isCodeFile)) return "docs";
+    if (some(isTestFile) && !some(isCodeFile)) return "test";
+    if (some(isCodeFile)) return "feat";
+    return "chore";
+  }
+  inferCommitTypeScored(diffOutput, files, currentTitle, subject) {
+    const lowerAll = (s) => (s || "").toLowerCase();
+    const d = lowerAll(diffOutput);
+    const t = lowerAll(currentTitle + " " + subject);
+    const isDocsFile = (f) => /(^docs\/|\.md$|README\.[^/]*$)/i.test(f);
+    const isTestFile = (f) => /(\.test\.|\.spec\.|__tests__\/|^tests\/)/i.test(f);
+    const isCiFile = (f) => /(^\.github\/|^\.circleci\/|gitlab-ci\.yml$|azure-pipelines\.yml$)/i.test(f);
+    const isBuildFile = (f) => /(^Dockerfile$|docker-compose|^turbo\.json$|^pnpm-workspace\.ya?ml$|^package\.json$|^vite\.config|^webpack\.config|^rollup\.config|^tsconfig\.json$|babel|^Makefile$)/i.test(f);
+    const isStyleFile = (f) => /(\.css$|\.scss$|\.sass$|\.less$)/i.test(f);
+    const isCodeFile = (f) => /(\.ts$|\.tsx$|\.js$|\.jsx$|\.py$|\.go$|\.rb$|\.rs$|\.java$|\.php$)/i.test(f);
+    const some = (pred) => files.some(pred);
+    const scores = { feat: 0, fix: 0, docs: 0, style: 0, refactor: 0, perf: 0, test: 0, build: 0, ci: 0, chore: 0 };
+    const add = (k, n, reason) => {
+      scores[k] += n;
+      console.log(`[Title] score +${n} => ${k} :: ${reason}`);
+    };
+    if (some(isCodeFile)) add("feat", 2, "code changes present");
+    if (some(isDocsFile)) add("docs", 2, "docs files present");
+    if (some(isTestFile)) add("test", 2, "test files present");
+    if (some(isCiFile)) add("ci", some(isCodeFile) ? 1 : 3, "ci files present");
+    if (some(isBuildFile)) add("build", some(isCodeFile) ? 2 : 3, "build files present");
+    if (some(isStyleFile)) add("style", 2, "style files present");
+    const monorepoSignals = /turbo\.json|pnpm-workspace\.ya?ml|\bmonorepo\b|\bturbo\b/.test(d + " " + t) || files.some((f) => /(^|\/)turbo\.json$|(^|\/)pnpm-workspace\.ya?ml$|^apps\//.test(f));
+    if (monorepoSignals) {
+      add("feat", 3, "monorepo/turbo/pnpm signals");
+      add("build", 2, "monorepo tooling changes");
+    }
+    const addedFileSignals = (d.match(/\bcreate mode\b|\bnew file mode\b/g) || []).length;
+    if (addedFileSignals >= 3) add("feat", 2, `many new files (${addedFileSignals})`);
+    if (/\brefactor(ing|ed|s)?\b|\bcleanup\b|\brestructure\b|\brename\b/.test(d + " " + t)) add("refactor", 2, "refactor keywords");
+    if (/\bperf(ormance)?\b|\boptimi[sz]e\b|\bfaster\b|\bspeed\b/.test(d + " " + t)) add("perf", 2, "performance keywords");
+    const fixStrong = /\bfix(e[sd]|ing)?\b|\bbug\b|\berror\b|\bissue\b|\bcorrect\b/.test(d + " " + t);
+    if (fixStrong) add("fix", 2, "fix/bug keywords");
+    let bestType = "chore";
+    let bestScore = -Infinity;
+    for (const [k, v] of Object.entries(scores)) {
+      if (v > bestScore) {
+        bestType = k;
+        bestScore = v;
+      }
+    }
+    if (bestType === "fix" && (monorepoSignals || addedFileSignals >= 3 || scores["feat"] >= scores["fix"] - 1)) {
+      console.log("[Title] adjust type: fix -> feat due to broader signals");
+      bestType = "feat";
+    }
+    if (bestType === "chore" && some(isCodeFile)) bestType = "feat";
+    console.log("[Title] infer (scored) -> result", { bestType, scores });
+    return bestType;
+  }
+  formatConventionalCommitTitle(subject, diffOutput, files, currentTitle) {
+    const parsed = this.parseConventionalCommitWithLog(subject);
+    let type = parsed.type;
+    let scope = parsed.scope;
+    let bareSubject = parsed.type ? parsed.subject : subject;
+    console.log("[Title] format -> initial", { subject, parsed, currentTitle });
+    if (!type) {
+      type = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
+    }
+    if (!scope) {
+      scope = this.chooseScopeFromFilesWithMonorepo(files) || void 0;
+    }
+    bareSubject = bareSubject.replace(/\s*#\d+\s*$/g, "").trim();
+    bareSubject = this.toImperativeWithLog(bareSubject);
+    const prefix = `${type}${scope ? `(${scope})` : ""}: `;
+    const maxLen = 72;
+    const allowedSubjectLen = Math.max(0, maxLen - prefix.length);
+    let finalSubject = bareSubject.length > allowedSubjectLen ? bareSubject.slice(0, allowedSubjectLen).trim() : bareSubject;
+    finalSubject = finalSubject.replace(/[\.!?]+$/g, "");
+    const finalTitle = `${prefix}${finalSubject}`;
+    console.log("[Title] format -> final", { type, scope, prefix, allowedSubjectLen, finalSubject, finalTitle });
+    return finalTitle;
+  }
   async run() {
     try {
       this.validateEventContext();
@@ -25432,6 +25755,8 @@ var PullRequestUpdater = class {
       core3.startGroup("Diff and Prompt");
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
       core3.info(`[PR-Description] diff length=${diffOutput.length}`);
+      const changedFiles = this.gitHelper.getChangedFiles(baseBranch, headBranch);
+      console.log("[Title] changed files", { count: changedFiles.length, files: changedFiles });
       const prompt = this.generatePrompt(diffOutput, creator);
       core3.info(`[PR-Description] prompt length=${prompt.length}`);
       core3.endGroup();
@@ -25442,9 +25767,25 @@ var PullRequestUpdater = class {
       core3.info(`[PR-Description] AI description content:
 ${generatedDescription}`);
       core3.endGroup();
+      const currentTitle = this.context.payload.pull_request.title || "";
+      let generatedTitle;
+      if (this.updateTitle) {
+        const titlePrompt = this.generateTitlePrompt(diffOutput, currentTitle);
+        core3.info(`[Title] title prompt prepared`);
+        const rawTitle = await this.aiHelper.createPullRequestDescription(diffOutput, titlePrompt);
+        core3.info(`[Title] raw AI title ${rawTitle}`);
+        const cleaned = this.sanitizeTitle(rawTitle);
+        core3.info(`[Title] cleaned AI title ${cleaned}`);
+        generatedTitle = this.formatConventionalCommitTitle(cleaned, diffOutput, changedFiles, currentTitle);
+        core3.info(`[Title] generated title (formatted) ${generatedTitle}`);
+      }
       core3.startGroup("PR Update");
       core3.info(`[PR-Description] updating pull request #${pullRequestNumber}`);
-      await this.updatePullRequestDescription(pullRequestNumber, generatedDescription);
+      await this.updatePullRequestDescription(
+        pullRequestNumber,
+        generatedDescription,
+        generatedTitle
+      );
       core3.endGroup();
       (0, import_core.setOutput)("pr_number", pullRequestNumber.toString());
       (0, import_core.setOutput)("description", generatedDescription);
@@ -25467,7 +25808,7 @@ ${generatedDescription}`);
     core3.info(`Head branch: ${headBranch}`);
     return { baseBranch, headBranch };
   }
-  async updatePullRequestDescription(pullRequestNumber, generatedDescription) {
+  async updatePullRequestDescription(pullRequestNumber, generatedDescription, generatedTitle) {
     try {
       const pullRequest = await this.fetchPullRequestDetails(pullRequestNumber);
       const currentDescription = pullRequest.body || "";
@@ -25480,7 +25821,11 @@ ${generatedDescription}`);
       core3.info(`[PR-Description] will apply new description prev=${currentDescription.length} new=${generatedDescription.length}`);
       core3.info(`[PR-Description] new description content:
 ${generatedDescription}`);
-      await this.applyPullRequestUpdate(pullRequestNumber, generatedDescription);
+      await this.applyPullRequestUpdate(
+        pullRequestNumber,
+        generatedDescription,
+        generatedTitle
+      );
     } catch (error3) {
       core3.error(`Error updating PR #${pullRequestNumber} description: ${error3.message}`);
       throw error3;
@@ -25509,14 +25854,19 @@ ${currentDescription}`
     });
     core3.info("Comment created successfully.");
   }
-  async applyPullRequestUpdate(pullRequestNumber, newDescription) {
-    core3.info("Updating PR description...");
-    await this.octokit.rest.pulls.update({
+  async applyPullRequestUpdate(pullRequestNumber, newDescription, newTitle) {
+    core3.info(`Updating PR description${newTitle ? "and title" : ""}...`);
+    const params = {
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       pull_number: pullRequestNumber,
       body: newDescription
-    });
+    };
+    if (newTitle && newTitle.length > 0) {
+      core3.info(`Updating PR title to: "${newTitle}"`);
+      params.title = newTitle;
+    }
+    await this.octokit.rest.pulls.update(params);
     core3.info("PR description updated successfully.");
   }
 };

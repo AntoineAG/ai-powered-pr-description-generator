@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert';
 import { test } from 'node:test';
-import { generateWithRetry } from '../src/ai/retry-utils';
+import { generateWithRetry } from '../src/core/utils/retry';
 
 test('generateWithRetry retries and succeeds', async () => {
   let callCount = 0;

@@ -66,6 +66,8 @@ Optional environment variables:
 - `ai_model` (optional): Model to use. Default depends on `ai_name`:
   - `gemini` -> `gemini-1.5-pro` (e.g., `gemini-2.5-flash`, `gemini-2.5-flash-lite`)
   - `open-ai` -> `gpt-4.1` (e.g., `gpt-4.1`, `gpt-4.1-mini`)
+- `update_title` (optional): When `true`, also generates and updates the PR title. Default: `false`.
+
 
 ## Usage
 Once configured, the action will automatically execute whenever a pull request is created or a commit is pushed to the repository.

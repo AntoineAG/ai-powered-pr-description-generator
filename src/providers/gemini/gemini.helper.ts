@@ -1,34 +1,35 @@
 import { EnhancedGenerateContentResponse, FinishReason, GenerateContentRequest, GenerateContentResult, GenerativeModel, GoogleGenerativeAI, UsageMetadata } from '@google/generative-ai';
-import { AIError } from './ai-error';
-import { ModelCache } from './model-cache';
-import { buildContinuationParts, buildGenerateRequest, buildUserPromptText, previewText, PROMPT_PREVIEW_LIMIT } from './prompt-utils';
-import { generateWithRetry } from './retry-utils';
-import { AIHelperInterface, GeminiConfig, Logger } from './types';
-import { buildUsageDiagnostics } from './usage-diagnostics';
+import { AIError } from '../../core/errors/ai.error';
+import { ModelCache } from '../../core/utils/cache';
+import { buildContinuationParts, buildGenerateRequest, buildUserPromptText, previewText, PROMPT_PREVIEW_LIMIT } from '../../core/prompt/prompt.builder';
+import { generateWithRetry } from '../../core/utils/retry';
+import { AIHelperInterface, GeminiConfig, Logger } from '../../core/types';
+import { buildUsageDiagnostics } from '../../core/diagnostics/usage-diagnostics';
 
 class GeminiAIHelper implements AIHelperInterface {
+  private readonly cache: ModelCache<GenerativeModel>;
+  private readonly client: GoogleGenerativeAI;
   private readonly config: GeminiConfig;
   private readonly logger: Logger;
-  private readonly cache: ModelCache<GenerativeModel>;
 
-  constructor(params: { config: GeminiConfig; logger: Logger }) {
+  constructor(params: { config: GeminiConfig; logger: Logger; client?: GoogleGenerativeAI }) {
     this.config = params.config;
     this.logger = params.logger;
-    const client = new GoogleGenerativeAI(this.config.apiKey);
-    this.cache = new ModelCache<GenerativeModel>((name: string) => {
-      const supportsSystem = this.supportsSystemInstruction(name);
-      const modelParams: Parameters<GoogleGenerativeAI['getGenerativeModel']>[0] = {
+    this.client = params.client ?? new GoogleGenerativeAI(this.config.apiKey);
+
+    this.cache = new ModelCache<GenerativeModel>((name) => {
+      const supportsSystem = GeminiAIHelper.supportsSystemInstruction(name);
+      return this.client.getGenerativeModel({
         model: name,
         ...(supportsSystem ? { systemInstruction: this.config.systemText } : {}),
-      };
-      return client.getGenerativeModel(modelParams);
+      });
     });
   }
 
   async createPullRequestDescription(_diffOutput: string, prompt: string): Promise<string> {
     try {
       const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
-      const supportsSystem = this.supportsSystemInstruction(modelName);
+      const supportsSystem = GeminiAIHelper.supportsSystemInstruction(modelName);
       const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
 
       this.logger.info(`[AI][Gemini]`);
@@ -110,7 +111,7 @@ class GeminiAIHelper implements AIHelperInterface {
     }
   }
 
-  private supportsSystemInstruction(name: string): boolean {
+  private static supportsSystemInstruction(name: string): boolean {
     return name.toLowerCase().startsWith('gemini-2');
   }
 

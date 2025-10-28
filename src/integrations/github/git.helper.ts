@@ -36,4 +36,24 @@ export class GitHelper {
       core.info(`Filtered diff length: ${diffOutput.length}`);
       return diffOutput;
   }
+
+  getChangedFiles(baseBranch: string, headBranch: string): string[] {
+    // Mirror ignore behavior from getGitDiff
+    const defaultIgnoreFiles = [
+      ':!**/package-lock.json',
+      ':!**/dist/*',
+    ];
+    const ignoreFiles = this.ignores
+      ? this.ignores.split(',').map((item) => `:!${item.trim()}`)
+      : defaultIgnoreFiles;
+
+    const output = execSync(
+      `git diff --name-only origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(' ')}`,
+      { encoding: 'utf8' }
+    );
+    return output
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
 }
