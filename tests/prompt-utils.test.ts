@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert';
 import { test } from 'node:test';
-import { buildContinuationParts, buildUserPromptText, previewText } from '../src/ai/prompt-utils';
+import { buildContinuationParts, buildUserPromptText, previewText } from '../src/core/prompt/prompt.builder';
 
 test('previewText truncates with ellipsis', () => {
   const input = 'a'.repeat(10);
@@ -23,4 +23,3 @@ test('buildContinuationParts structure', () => {
   assert.equal(parts[1].role, 'model');
   assert.equal((parts[1].parts?.[0] as any).text, 'prev');
 });
-

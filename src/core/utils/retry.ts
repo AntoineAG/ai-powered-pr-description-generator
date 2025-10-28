@@ -1,4 +1,4 @@
-import { Logger, RetryConfig } from './types';
+import { Logger, RetryConfig } from '../../core/types';
 
 export interface RetryOptions {
   logger: Logger;

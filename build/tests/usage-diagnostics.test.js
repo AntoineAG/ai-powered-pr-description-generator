@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert_1 = require("assert");
 const node_test_1 = require("node:test");
-const usage_diagnostics_1 = require("../src/ai/usage-diagnostics");
+const usage_diagnostics_1 = require("../src/core/diagnostics/usage-diagnostics");
 (0, node_test_1.test)('usage diagnostics basic estimation', () => {
     const usage = { promptTokenCount: 10, candidatesTokenCount: 30, totalTokenCount: 40 };
     const text = 'a'.repeat(40); // ~10 tokens visible approx

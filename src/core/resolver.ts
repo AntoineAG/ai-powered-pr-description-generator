@@ -1,7 +1,8 @@
 import * as core from '@actions/core';
-import { buildGeminiConfig, buildOpenAIConfig } from './config-utils';
-import GeminiAIHelper from './gemini-ai-helper';
-import OpenAIHelper from './open-ai-helper';
+import { buildGeminiConfig } from '../providers/gemini/gemini.config';
+import { buildOpenAIConfig } from '../providers/openai/openai.config';
+import GeminiAIHelper from '../providers/gemini/gemini.helper';
+import OpenAIHelper from '../providers/openai/openai.helper';
 import { AIHelperInterface, AIHelperParams, Logger } from './types';
 
 const aiHelperResolver = (aiHelperParams: AIHelperParams): AIHelperInterface => {

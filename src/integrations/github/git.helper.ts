@@ -18,22 +18,21 @@ export class GitHelper {
   }
 
   getGitDiff(baseBranch: string, headBranch: string): string {
-      // The list of files to ignore to send to AI API
       const defaultIgnoreFiles = [
           ':!**/package-lock.json',
           ':!**/dist/*',       
       ];
   
       const ignoreFiles = this.ignores 
-          ? this.ignores.split(',').map(item => `:!${item.trim()}`) // Trim whitespace from items
+          ? this.ignores.split(',').map(item => `:!${item.trim()}`)
           : defaultIgnoreFiles;
   
       core.info(`Ignore files: ${JSON.stringify(ignoreFiles)}`);
   
-      // Execute the git diff command and get the output
       const diffOutput = execSync(`git diff origin/${baseBranch} origin/${headBranch} -- ${ignoreFiles.join(' ')}`, { encoding: 'utf8' });
       
       core.info(`Filtered diff length: ${diffOutput.length}`);
       return diffOutput;
   }
 }
+

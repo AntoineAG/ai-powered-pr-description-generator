@@ -1,9 +1,9 @@
 import * as core from '@actions/core';
 import { getInput, setFailed, setOutput } from '@actions/core';
 import { context, getOctokit } from '@actions/github';
-import aiHelperResolver from './ai/ai-helper-resolver';
-import { AIHelperInterface } from './ai/types';
-import { GitHelper } from './git-helper';
+import aiHelperResolver from '../../core/resolver';
+import { AIHelperInterface } from '../../core/types';
+import { GitHelper } from '../../integrations/github/git.helper';
 
 class PullRequestUpdater {
   private gitHelper: GitHelper;

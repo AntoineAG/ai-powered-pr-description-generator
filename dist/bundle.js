@@ -23865,15 +23865,15 @@ var require_github = __commonJS({
   }
 });
 
-// src/pull-request-updater.ts
+// src/features/pull-requests/pull-request-updater.ts
 var core3 = __toESM(require_core());
 var import_core = __toESM(require_core());
 var import_github = __toESM(require_github());
 
-// src/ai/ai-helper-resolver.ts
+// src/core/resolver.ts
 var core = __toESM(require_core());
 
-// src/ai/config-utils.ts
+// src/core/config/config.factory.ts
 var DEFAULT_MAX_OUTPUT_TOKENS = 1536;
 var MIN_MAX_OUTPUT_TOKENS = 768;
 var DEFAULT_RETRY_CONFIG = {
@@ -23914,6 +23914,8 @@ function buildProviderCommonConfig(params) {
     retry: buildRetryConfigFromEnv(params.retry)
   };
 }
+
+// src/providers/gemini/gemini.config.ts
 function buildGeminiConfig(aiParams, options) {
   const providerDefaults = {
     model: (aiParams.model || "gemini-2.5-flash").trim(),
@@ -23926,6 +23928,8 @@ function buildGeminiConfig(aiParams, options) {
     ...common
   };
 }
+
+// src/providers/openai/openai.config.ts
 function buildOpenAIConfig(aiParams, options) {
   const providerDefaults = {
     model: (aiParams.model || "gpt-4.1").trim(),
@@ -24947,7 +24951,7 @@ var GoogleGenerativeAI = class {
   }
 };
 
-// src/ai/ai-error.ts
+// src/core/errors/ai.error.ts
 var AIError = class _AIError extends Error {
   constructor(message, meta, cause) {
     super(message);
@@ -24960,7 +24964,7 @@ var AIError = class _AIError extends Error {
   }
 };
 
-// src/ai/model-cache.ts
+// src/core/utils/cache.ts
 var ModelCache = class {
   constructor(builder) {
     this.builder = builder;
@@ -24975,7 +24979,7 @@ var ModelCache = class {
   }
 };
 
-// src/ai/prompt-utils.ts
+// src/core/prompt/prompt.builder.ts
 var PROMPT_PREVIEW_LIMIT = 2e3;
 function previewText(text, limit = PROMPT_PREVIEW_LIMIT) {
   if (!text) return "";
@@ -25000,7 +25004,7 @@ function buildGenerateRequest(params) {
   };
 }
 
-// src/ai/retry-utils.ts
+// src/core/utils/retry.ts
 var defaultRetryClassifier = {
   isRetryable: (e) => {
     const status = typeof e?.status === "number" ? e.status : void 0;
@@ -25057,7 +25061,7 @@ async function generateWithRetry(task, options, classifier = defaultRetryClassif
   throw new Error(`[AI][${provider}] Exhausted retry attempts after ${elapsed}ms`);
 }
 
-// src/ai/usage-diagnostics.ts
+// src/core/diagnostics/usage-diagnostics.ts
 function buildUsageDiagnostics(usage, text) {
   const num = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
   const u = usage || {};
@@ -25096,25 +25100,24 @@ function buildUsageDiagnostics(usage, text) {
   };
 }
 
-// src/ai/gemini-ai-helper.ts
-var GeminiAIHelper = class {
+// src/providers/gemini/gemini.helper.ts
+var GeminiAIHelper = class _GeminiAIHelper {
   constructor(params) {
     this.config = params.config;
     this.logger = params.logger;
-    const client = new GoogleGenerativeAI(this.config.apiKey);
+    this.client = params.client ?? new GoogleGenerativeAI(this.config.apiKey);
     this.cache = new ModelCache((name) => {
-      const supportsSystem = this.supportsSystemInstruction(name);
-      const modelParams = {
+      const supportsSystem = _GeminiAIHelper.supportsSystemInstruction(name);
+      return this.client.getGenerativeModel({
         model: name,
         ...supportsSystem ? { systemInstruction: this.config.systemText } : {}
-      };
-      return client.getGenerativeModel(modelParams);
+      });
     });
   }
   async createPullRequestDescription(_diffOutput, prompt) {
     try {
       const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
-      const supportsSystem = this.supportsSystemInstruction(modelName);
+      const supportsSystem = _GeminiAIHelper.supportsSystemInstruction(modelName);
       const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Request`);
@@ -25190,7 +25193,7 @@ ${more}`);
       throw AIError.wrap(`Gemini API Error: ${msg}`, { provider: "Gemini", statusCode: status });
     }
   }
-  supportsSystemInstruction(name) {
+  static supportsSystemInstruction(name) {
     return name.toLowerCase().startsWith("gemini-2");
   }
   concatCandidatePartsText(resp) {
@@ -25208,9 +25211,9 @@ ${more}`);
     return buf.join("").trim();
   }
 };
-var gemini_ai_helper_default = GeminiAIHelper;
+var gemini_helper_default = GeminiAIHelper;
 
-// src/ai/open-ai-helper.ts
+// src/providers/openai/openai.helper.ts
 var OpenAIHelper = class {
   constructor(params) {
     this.config = params.config;
@@ -25326,9 +25329,9 @@ ${more}`);
     }
   }
 };
-var open_ai_helper_default = OpenAIHelper;
+var openai_helper_default = OpenAIHelper;
 
-// src/ai/ai-helper-resolver.ts
+// src/core/resolver.ts
 var aiHelperResolver = (aiHelperParams) => {
   const { aiName, model, temperature } = aiHelperParams;
   core.info(`[AI] Resolver -> provider=${aiName}, model=${model}, temperature=${temperature}`);
@@ -25344,18 +25347,18 @@ var aiHelperResolver = (aiHelperParams) => {
     case "open-ai":
     case "openai": {
       const config = buildOpenAIConfig(aiHelperParams);
-      return new open_ai_helper_default({ config, logger });
+      return new openai_helper_default({ config, logger });
     }
     case "gemini":
     default: {
       const config = buildGeminiConfig(aiHelperParams);
-      return new gemini_ai_helper_default({ config, logger });
+      return new gemini_helper_default({ config, logger });
     }
   }
 };
-var ai_helper_resolver_default = aiHelperResolver;
+var resolver_default = aiHelperResolver;
 
-// src/git-helper.ts
+// src/integrations/github/git.helper.ts
 var core2 = __toESM(require_core());
 var import_child_process = require("child_process");
 var GitHelper = class {
@@ -25382,7 +25385,7 @@ var GitHelper = class {
   }
 };
 
-// src/pull-request-updater.ts
+// src/features/pull-requests/pull-request-updater.ts
 var PullRequestUpdater = class {
   constructor() {
     this.gitHelper = new GitHelper((0, import_core.getInput)("ignores"));
@@ -25391,7 +25394,7 @@ var PullRequestUpdater = class {
     const model = ((0, import_core.getInput)("ai_model") || "").trim() || (aiName === "openai" ? "gpt-4.1" : "gemini-2.5-flash");
     const apiKey = (0, import_core.getInput)("api_key", { required: true }).trim();
     const temperature = Number.parseFloat((0, import_core.getInput)("temperature") || "0.8");
-    this.aiHelper = ai_helper_resolver_default({ apiKey, aiName, temperature, model });
+    this.aiHelper = resolver_default({ apiKey, aiName, temperature, model });
     core3.info(`[PR-Description] AI configured provider=${aiName} model=${model} temperature=${temperature}`);
     const githubToken = (0, import_core.getInput)("github_token", { required: true }).trim();
     this.octokit = (0, import_github.getOctokit)(githubToken);

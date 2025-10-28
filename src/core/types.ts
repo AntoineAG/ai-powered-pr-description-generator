@@ -9,7 +9,6 @@ export interface AIHelperParams {
   model?: string,
 }
 
-// Minimal logger interface to keep helpers testable and provider-agnostic
 export interface Logger {
   startGroup: (msg: string) => void,
   endGroup: () => void,
@@ -24,7 +23,6 @@ export interface RetryConfig {
   baseDelayMs: number;
   maxDelayMs: number;
   jitterMs: number;
-  // After this many consecutive 503s, switch model if possible
   consecutive503ToSwitch?: number;
   modelLadder?: string[];
 }
@@ -37,15 +35,14 @@ export interface ProviderCommonConfig {
   retry: RetryConfig;
 }
 
-// Strong, constructor-only configuration for Gemini helper
 export interface GeminiConfig extends ProviderCommonConfig {
   apiKey: string;
 }
 
-// Strong, constructor-only configuration for OpenAI helper
 export interface OpenAIConfig extends ProviderCommonConfig {
   apiKey: string;
   baseUrl?: string;
 }
 
 export type ProviderName = 'gemini' | 'openai';
+
