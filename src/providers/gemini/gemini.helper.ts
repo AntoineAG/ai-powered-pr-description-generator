@@ -80,21 +80,33 @@ class GeminiAIHelper implements AIHelperInterface {
         if (!text || text.trim().length === 0) {
           const bumped = Math.ceil(maxOutputTokens * 1.5);
           this.logger.info(`[AI][Gemini] MAX_TOKENS with empty output; retry maxOutputTokens=${bumped}`);
-          const retryPayload: GenerateContentRequest = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
-          const res = await this.cache.getOrBuild(retryOutcome.modelUsed).generateContent(retryPayload);
-          const retryResp: EnhancedGenerateContentResponse = res.response;
+          const retryOutcome2 = await generateWithRetry<GenerateContentResult>(
+            async (activeModelName) => {
+              const model = this.cache.getOrBuild(activeModelName);
+              const rp: GenerateContentRequest = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
+              return model.generateContent(rp);
+            },
+            { logger: this.logger, provider: 'Gemini', initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+          );
+          const retryResp: EnhancedGenerateContentResponse = retryOutcome2.value.response;
           const retryText = this.concatCandidatePartsText(retryResp);
           const frRetry: FinishReason | undefined = retryResp.candidates?.[0]?.finishReason;
           this.logger.info(`[AI][Gemini] Retry finishReason=${frRetry} length=${retryText.length}`);
           text = retryText;
         } else {
           this.logger.info('[AI][Gemini] continuation: MAX_TOKENS with non-empty output, requesting continuation...');
-          const contPayload: GenerateContentRequest = {
-            contents: buildContinuationParts(text, unifiedPrompt),
-            generationConfig: { temperature, maxOutputTokens },
-          };
-          const cont = await this.cache.getOrBuild(retryOutcome.modelUsed).generateContent(contPayload);
-          const contResp: EnhancedGenerateContentResponse = cont.response;
+          const retryOutcome3 = await generateWithRetry<GenerateContentResult>(
+            async (activeModelName) => {
+              const model = this.cache.getOrBuild(activeModelName);
+              const contPayload: GenerateContentRequest = {
+                contents: buildContinuationParts(text, unifiedPrompt),
+                generationConfig: { temperature, maxOutputTokens },
+              };
+              return model.generateContent(contPayload);
+            },
+            { logger: this.logger, provider: 'Gemini', initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+          );
+          const contResp: EnhancedGenerateContentResponse = retryOutcome3.value.response;
           const more = this.concatCandidatePartsText(contResp);
           const fr2: FinishReason | undefined = contResp.candidates?.[0]?.finishReason;
           this.logger.info(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);

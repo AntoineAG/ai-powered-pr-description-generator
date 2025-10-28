@@ -82,36 +82,49 @@ class OpenAIHelper implements AIHelperInterface {
       // If output was cut by token limit, try a single continuation
       if (finishReason === 'length') {
         this.logger.info('[AI][OpenAI] continuation: finish_reason=length, requesting more...');
-        const contResp = await fetch((this.config.baseUrl || 'https://api.openai.com') + '/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.config.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: systemText },
-              { role: 'user', content: unifiedPrompt },
-              { role: 'assistant', content: text },
-              { role: 'user', content: 'Continue from where you left off. Do not repeat earlier content. Keep the same structure and style.' },
-            ],
-            temperature,
-            max_tokens: Math.floor(this.config.maxOutputTokens / 2),
-          }),
+        const performCont = async (activeModel: string) => {
+          const resp = await fetch((this.config.baseUrl || 'https://api.openai.com') + '/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${this.config.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: activeModel,
+              messages: [
+                { role: 'system', content: systemText },
+                { role: 'user', content: unifiedPrompt },
+                { role: 'assistant', content: text },
+                { role: 'user', content: 'Continue from where you left off. Do not repeat earlier content. Keep the same structure and style.' },
+              ],
+              temperature,
+              max_tokens: Math.floor(this.config.maxOutputTokens / 2),
+            }),
+          });
+          const raw = await resp.text();
+          if (!resp.ok) {
+            throw new AIError(`OpenAI API HTTP ${resp.status}: ${raw}`, { provider: 'OpenAI', model: activeModel, statusCode: resp.status });
+          }
+          let data: any;
+          try { data = JSON.parse(raw); } catch (e) { throw new AIError('OpenAI API parse error', { provider: 'OpenAI', model: activeModel }, e); }
+          if (data.error) {
+            throw new AIError(`OpenAI API Error: ${data.error.message}`, { provider: 'OpenAI', model: activeModel, statusCode: data.error?.code });
+          }
+          return data;
+        };
+
+        const contOutcome = await generateWithRetry<any>(performCont, {
+          logger: this.logger,
+          provider: 'OpenAI',
+          initialModel: model,
+          retry: this.config.retry,
         });
-        const contRaw = await contResp.text();
-        if (contResp.ok) {
-          let contData: any;
-          try { contData = JSON.parse(contRaw); } catch { contData = {}; }
-          const more = (contData.choices?.[0]?.message?.content || '').trim();
-          const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
-          this.logger.info(`[AI][OpenAI] Continuation finishReason=${fr2} moreLength=${more.length}`);
-          this.logger.info(`[AI][OpenAI] more:\n${more}`);
-          text = (text + '\n\n' + more).trim();
-        } else {
-          this.logger.warn(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
-        }
+
+        const more = (contOutcome.value.choices?.[0]?.message?.content || '').trim();
+        const fr2 = contOutcome.value.choices?.[0]?.finish_reason || contOutcome.value.choices?.[0]?.finishReason;
+        this.logger.info(`[AI][OpenAI] Continuation finishReason=${fr2} moreLength=${more.length}`);
+        this.logger.info(`[AI][OpenAI] more:\n${more}`);
+        text = (text + '\n\n' + more).trim();
       }
 
       const parsed = this.parseUnifiedContent(text);

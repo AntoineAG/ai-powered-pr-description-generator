@@ -25185,21 +25185,33 @@ ${text}`);
         if (!text || text.trim().length === 0) {
           const bumped = Math.ceil(maxOutputTokens * 1.5);
           this.logger.info(`[AI][Gemini] MAX_TOKENS with empty output; retry maxOutputTokens=${bumped}`);
-          const retryPayload = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
-          const res = await this.cache.getOrBuild(retryOutcome.modelUsed).generateContent(retryPayload);
-          const retryResp = res.response;
+          const retryOutcome2 = await generateWithRetry(
+            async (activeModelName) => {
+              const model = this.cache.getOrBuild(activeModelName);
+              const rp = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
+              return model.generateContent(rp);
+            },
+            { logger: this.logger, provider: "Gemini", initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+          );
+          const retryResp = retryOutcome2.value.response;
           const retryText = this.concatCandidatePartsText(retryResp);
           const frRetry = retryResp.candidates?.[0]?.finishReason;
           this.logger.info(`[AI][Gemini] Retry finishReason=${frRetry} length=${retryText.length}`);
           text = retryText;
         } else {
           this.logger.info("[AI][Gemini] continuation: MAX_TOKENS with non-empty output, requesting continuation...");
-          const contPayload = {
-            contents: buildContinuationParts(text, unifiedPrompt),
-            generationConfig: { temperature, maxOutputTokens }
-          };
-          const cont = await this.cache.getOrBuild(retryOutcome.modelUsed).generateContent(contPayload);
-          const contResp = cont.response;
+          const retryOutcome3 = await generateWithRetry(
+            async (activeModelName) => {
+              const model = this.cache.getOrBuild(activeModelName);
+              const contPayload = {
+                contents: buildContinuationParts(text, unifiedPrompt),
+                generationConfig: { temperature, maxOutputTokens }
+              };
+              return model.generateContent(contPayload);
+            },
+            { logger: this.logger, provider: "Gemini", initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+          );
+          const contResp = retryOutcome3.value.response;
           const more = this.concatCandidatePartsText(contResp);
           const fr2 = contResp.candidates?.[0]?.finishReason;
           this.logger.info(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
@@ -25361,41 +25373,52 @@ ${text}`);
       this.logger.info(`::endgroup::`);
       if (finishReason === "length") {
         this.logger.info("[AI][OpenAI] continuation: finish_reason=length, requesting more...");
-        const contResp = await fetch((this.config.baseUrl || "https://api.openai.com") + "/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${this.config.apiKey}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: "system", content: systemText },
-              { role: "user", content: unifiedPrompt },
-              { role: "assistant", content: text },
-              { role: "user", content: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }
-            ],
-            temperature,
-            max_tokens: Math.floor(this.config.maxOutputTokens / 2)
-          })
-        });
-        const contRaw = await contResp.text();
-        if (contResp.ok) {
-          let contData;
-          try {
-            contData = JSON.parse(contRaw);
-          } catch {
-            contData = {};
+        const performCont = async (activeModel) => {
+          const resp = await fetch((this.config.baseUrl || "https://api.openai.com") + "/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${this.config.apiKey}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              model: activeModel,
+              messages: [
+                { role: "system", content: systemText },
+                { role: "user", content: unifiedPrompt },
+                { role: "assistant", content: text },
+                { role: "user", content: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }
+              ],
+              temperature,
+              max_tokens: Math.floor(this.config.maxOutputTokens / 2)
+            })
+          });
+          const raw = await resp.text();
+          if (!resp.ok) {
+            throw new AIError(`OpenAI API HTTP ${resp.status}: ${raw}`, { provider: "OpenAI", model: activeModel, statusCode: resp.status });
           }
-          const more = (contData.choices?.[0]?.message?.content || "").trim();
-          const fr2 = contData.choices?.[0]?.finish_reason || contData.choices?.[0]?.finishReason;
-          this.logger.info(`[AI][OpenAI] Continuation finishReason=${fr2} moreLength=${more.length}`);
-          this.logger.info(`[AI][OpenAI] more:
+          let data;
+          try {
+            data = JSON.parse(raw);
+          } catch (e) {
+            throw new AIError("OpenAI API parse error", { provider: "OpenAI", model: activeModel }, e);
+          }
+          if (data.error) {
+            throw new AIError(`OpenAI API Error: ${data.error.message}`, { provider: "OpenAI", model: activeModel, statusCode: data.error?.code });
+          }
+          return data;
+        };
+        const contOutcome = await generateWithRetry(performCont, {
+          logger: this.logger,
+          provider: "OpenAI",
+          initialModel: model,
+          retry: this.config.retry
+        });
+        const more = (contOutcome.value.choices?.[0]?.message?.content || "").trim();
+        const fr2 = contOutcome.value.choices?.[0]?.finish_reason || contOutcome.value.choices?.[0]?.finishReason;
+        this.logger.info(`[AI][OpenAI] Continuation finishReason=${fr2} moreLength=${more.length}`);
+        this.logger.info(`[AI][OpenAI] more:
 ${more}`);
-          text = (text + "\n\n" + more).trim();
-        } else {
-          this.logger.warn(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
-        }
+        text = (text + "\n\n" + more).trim();
       }
       const parsed = this.parseUnifiedContent(text);
       this.logger.info(`[AI][OpenAI] content: titleLength=${parsed.title.length} descLength=${parsed.description.length}`);
