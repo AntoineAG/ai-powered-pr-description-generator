@@ -24999,17 +24999,32 @@ function buildUserPromptText(systemText, prompt, supportsSystemInstruction) {
 
 ${prompt}`;
 }
-function buildContinuationParts(previousOutput, prompt) {
-  return [
-    { role: "user", parts: [{ text: prompt }] },
-    { role: "model", parts: [{ text: previousOutput }] },
-    { role: "user", parts: [{ text: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }] }
-  ];
-}
 function buildGenerateRequest(params) {
+  const schema = {
+    type: SchemaType.OBJECT,
+    properties: {
+      title: {
+        type: SchemaType.OBJECT,
+        properties: {
+          subject: { type: SchemaType.STRING },
+          type: { type: SchemaType.STRING, nullable: true },
+          scope: { type: SchemaType.STRING, nullable: true },
+          conventional: { type: SchemaType.STRING }
+        },
+        required: ["subject", "conventional"]
+      },
+      description: { type: SchemaType.STRING }
+    },
+    required: ["title", "description"]
+  };
   return {
     contents: [{ role: "user", parts: [{ text: params.userText }] }],
-    generationConfig: { temperature: params.temperature, maxOutputTokens: params.maxOutputTokens }
+    generationConfig: {
+      temperature: params.temperature,
+      maxOutputTokens: params.maxOutputTokens,
+      responseMimeType: "application/json",
+      responseSchema: schema
+    }
   };
 }
 function buildUnifiedPRPrompt(params) {
@@ -25043,6 +25058,7 @@ Description rules:
 - Keep it simple and reviewer-friendly.
 - Avoid code snippets or images.
 - Add some fun with emojis from [${allowedEmojis}] only: at most one emoji per item, and at most 3 total.
+- Use max 5 items; each \u2264 12 words; total \u2264 180 words.
 ` + (creator ? `- Thank **${creator}** for the contribution! \u{1F389}
 ` : "") + `
 Context:
@@ -25124,6 +25140,14 @@ async function generateWithRetry(task, options, classifier = defaultRetryClassif
 }
 
 // src/providers/gemini/gemini.helper.ts
+var DESC_EXCERPT_CHARS = 500;
+var TAIL_OVERLAP_CHARS = 200;
+function isRecord(v) {
+  return typeof v === "object" && v !== null;
+}
+function isString(v) {
+  return typeof v === "string";
+}
 var GeminiAIHelper = class _GeminiAIHelper {
   constructor(params) {
     this.config = params.config;
@@ -25161,7 +25185,7 @@ ${promptPreview}`);
       );
       const response = retryOutcome.value.response;
       let text = this.concatCandidatePartsText(response);
-      const usage = response.usageMetadata || retryOutcome.value.usageMetadata || void 0;
+      const usage = response.usageMetadata;
       const finishReason = response.candidates?.[0]?.finishReason;
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Response`);
@@ -25182,51 +25206,73 @@ ${text}`);
       } else if (diag.thoughtsRatio > 0.9) {
         this.logger.warn("[AI][Gemini] High thoughts/output token ratio (>90%). Consider increasing maxOutputTokens or tightening the prompt.");
       }
-      if (finishReason === FinishReason.MAX_TOKENS) {
-        if (!text || text.trim().length === 0) {
-          const bumped = Math.ceil(maxOutputTokens * 1.5);
-          this.logger.info(`[AI][Gemini] MAX_TOKENS with empty output; retry maxOutputTokens=${bumped}`);
-          const retryOutcome2 = await generateWithRetry(
-            async (activeModelName) => {
-              const model = this.cache.getOrBuild(activeModelName);
-              const rp = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
-              return model.generateContent(rp);
-            },
-            { logger: this.logger, provider: "Gemini", initialModel: retryOutcome.modelUsed, retry: this.config.retry }
-          );
-          const retryResp = retryOutcome2.value.response;
-          const retryText = this.concatCandidatePartsText(retryResp);
-          const frRetry = retryResp.candidates?.[0]?.finishReason;
-          this.logger.info(`[AI][Gemini] Retry finishReason=${frRetry} length=${retryText.length}`);
-          text = retryText;
-        } else {
-          this.logger.info("[AI][Gemini] continuation: MAX_TOKENS with non-empty output, requesting continuation...");
-          const retryOutcome3 = await generateWithRetry(
-            async (activeModelName) => {
-              const model = this.cache.getOrBuild(activeModelName);
-              const contPayload = {
-                contents: buildContinuationParts(text, unifiedPrompt),
-                generationConfig: { temperature, maxOutputTokens }
-              };
-              return model.generateContent(contPayload);
-            },
-            { logger: this.logger, provider: "Gemini", initialModel: retryOutcome.modelUsed, retry: this.config.retry }
-          );
-          const contResp = retryOutcome3.value.response;
-          const more = this.concatCandidatePartsText(contResp);
-          const fr2 = contResp.candidates?.[0]?.finishReason;
-          this.logger.info(`[AI][Gemini] Continuation finishReason=${fr2} moreLength=${more.length}`);
-          this.logger.info(`[AI][Gemini] more:
-${more}`);
-          text = (text + "\n\n" + more).trim();
+      let parsed = null;
+      try {
+        parsed = this.parseUnifiedContent(text);
+      } catch (_) {
+        parsed = null;
+      }
+      if (!parsed && finishReason === FinishReason.MAX_TOKENS && (!text || text.trim().length === 0)) {
+        const bumped = Math.ceil(maxOutputTokens * 1.5);
+        this.logger.info(`[AI][Gemini] MAX_TOKENS with empty output; retry maxOutputTokens=${bumped}`);
+        const retryOutcome2 = await generateWithRetry(
+          async (activeModelName) => {
+            const model = this.cache.getOrBuild(activeModelName);
+            const rp = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
+            return model.generateContent(rp);
+          },
+          { logger: this.logger, provider: "Gemini", initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+        );
+        const retryResp = retryOutcome2.value.response;
+        text = this.concatCandidatePartsText(retryResp);
+        try {
+          parsed = this.parseUnifiedContent(text);
+        } catch (_) {
+          parsed = null;
         }
       }
-      const parsed = this.parseUnifiedContent(text);
+      if (!parsed) {
+        const cleaned = this.stripCodeFences(text);
+        const titleObj = this.extractTitleObject(cleaned);
+        const partialDesc = this.extractDescriptionPrefix(cleaned);
+        if (!titleObj || !partialDesc) {
+          throw new AIError("Gemini unified content parse error: non-JSON output", { provider: "Gemini" });
+        }
+        const partialDescUnescaped = this.unescapeJsonStringFragment(partialDesc);
+        const tailMax = Math.min(Math.ceil(maxOutputTokens * 1.5), 4096);
+        this.logger.info("[AI][Gemini] continuation: truncated JSON detected; requesting JSON tail only...");
+        const retryOutcome3 = await generateWithRetry(
+          async (activeModelName) => {
+            const model = this.cache.getOrBuild(activeModelName);
+            const contPayload = this.buildTailContinuationRequest(partialDescUnescaped, temperature, tailMax);
+            return model.generateContent(contPayload);
+          },
+          { logger: this.logger, provider: "Gemini", initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+        );
+        const contResp = retryOutcome3.value.response;
+        const contText = this.concatCandidatePartsText(contResp);
+        this.logger.info(`[AI][Gemini] Tail raw:
+${contText}`);
+        const tailObj = this.tryParseJson(contText);
+        if (!this.isTailResponse(tailObj)) {
+          throw new AIError("Gemini unified content parse error: continuation did not return description_tail", { provider: "Gemini" });
+        }
+        const finalDescription = this.appendTailWithOverlap(partialDescUnescaped, tailObj.description_tail);
+        parsed = {
+          title: (titleObj.conventional || titleObj.subject || "").toString().trim(),
+          description: finalDescription,
+          meta: {
+            type: titleObj.type || void 0,
+            scope: titleObj.scope || void 0,
+            subject: titleObj.subject || void 0
+          }
+        };
+      }
       this.logger.info(`[AI][Gemini] content: titleLength=${parsed.title.length} descLength=${parsed.description.length}`);
       return parsed;
     } catch (error3) {
-      const status = error3?.status;
-      const msg = error3?.message ? String(error3.message) : String(error3);
+      const status = typeof error3?.status === "number" ? error3.status : void 0;
+      const msg = error3 instanceof Error ? error3.message : String(error3);
       this.logger.error(`[AI][Gemini] \u274C exception status=${status ?? "n/a"} message=${msg}`);
       throw AIError.wrap(`Gemini API Error: ${msg}`, { provider: "Gemini", statusCode: status });
     }
@@ -25235,10 +25281,14 @@ ${more}`);
     return name.toLowerCase().startsWith("gemini-2");
   }
   concatCandidatePartsText(resp) {
-    const parts = resp?.candidates?.[0]?.content?.parts || [];
+    const partsMaybe = resp?.candidates?.[0]?.content?.parts;
     const buf = [];
-    for (const p of parts) {
-      if (typeof p?.text === "string") buf.push(p.text);
+    if (Array.isArray(partsMaybe)) {
+      for (const p of partsMaybe) {
+        if (isRecord(p) && "text" in p && isString(p.text)) {
+          buf.push(p.text);
+        }
+      }
     }
     if (buf.length === 0) {
       try {
@@ -25248,6 +25298,105 @@ ${more}`);
     }
     return buf.join("").trim();
   }
+  stripCodeFences(text) {
+    if (!text) return "";
+    return text.replace(/^```[a-zA-Z]*\s*$/gm, "").replace(/```\s*$/gm, "").trim();
+  }
+  tryParseJson(s) {
+    try {
+      return JSON.parse(s);
+    } catch {
+    }
+    const start = s.indexOf("{");
+    const end = s.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      const sliced = s.slice(start, end + 1);
+      try {
+        return JSON.parse(sliced);
+      } catch {
+      }
+    }
+    return null;
+  }
+  extractTitleObject(text) {
+    const m = /"title"\s*:\s*\{([\s\S]*?)\}/m.exec(text);
+    if (!m) return null;
+    const objRaw = "{" + m[1] + "}";
+    const rec = this.tryParseJson(objRaw);
+    if (!isRecord(rec)) return null;
+    return {
+      subject: isString(rec.subject) ? rec.subject : void 0,
+      type: isString(rec.type) ? rec.type : rec.type === null ? null : void 0,
+      scope: isString(rec.scope) ? rec.scope : rec.scope === null ? null : void 0,
+      conventional: isString(rec.conventional) ? rec.conventional : void 0
+    };
+  }
+  extractDescriptionPrefix(text) {
+    const re = /"description"\s*:\s*"/m;
+    const m = re.exec(text);
+    if (!m) return null;
+    const start = (m.index || 0) + m[0].length;
+    return text.slice(start);
+  }
+  unescapeJsonStringFragment(s) {
+    if (!s) return "";
+    let out = s;
+    out = out.replace(/\\\\/g, "\\");
+    out = out.replace(/\\"/g, '"');
+    out = out.replace(/\\n/g, "\n");
+    out = out.replace(/\\r/g, "");
+    out = out.replace(/\\t/g, "	");
+    return out;
+  }
+  buildTailContinuationRequest(prefix, temperature, maxOutputTokens) {
+    const excerpt = prefix.length > DESC_EXCERPT_CHARS ? prefix.slice(-DESC_EXCERPT_CHARS) : prefix;
+    const tailSchema = {
+      type: SchemaType.OBJECT,
+      properties: { description_tail: { type: SchemaType.STRING } },
+      required: ["description_tail"]
+    };
+    const instruction = [
+      "The previous JSON response was truncated due to token limits.",
+      'You already produced the beginning of the "description".',
+      "Continue EXACTLY from where it stopped and return only the missing remainder.",
+      "",
+      "Output STRICT JSON only with this shape:",
+      '{ "description_tail": string }',
+      "",
+      "Rules:",
+      "- Do NOT repeat any part already produced.",
+      "- Keep the same style and structure (continue the Markdown list if it was started).",
+      '- Do not re-emit the "title".',
+      "- No code fences, no commentary.",
+      "- Stay within the original limits: max 5 items, each \u2264 12 words, total \u2264 180 words."
+    ].join("\n");
+    const contextMsg = "Here is the last " + String(DESC_EXCERPT_CHARS) + " characters of the description you already produced:\n" + excerpt;
+    return {
+      contents: [
+        { role: "user", parts: [{ text: instruction }] },
+        { role: "user", parts: [{ text: contextMsg }] }
+      ],
+      generationConfig: {
+        temperature,
+        maxOutputTokens,
+        responseMimeType: "application/json",
+        responseSchema: tailSchema
+      }
+    };
+  }
+  appendTailWithOverlap(base, tail, overlap = TAIL_OVERLAP_CHARS) {
+    const b = base || "";
+    const t = tail || "";
+    if (!b) return (b + t).trim();
+    const suffix = b.slice(-overlap);
+    if (t.startsWith(suffix)) {
+      return (b + t.slice(suffix.length)).trim();
+    }
+    return (b + t).trim();
+  }
+  isTailResponse(obj) {
+    return isRecord(obj) && isString(obj.description_tail);
+  }
   parseUnifiedContent(text) {
     const tryParse = (s) => {
       try {
@@ -25256,23 +25405,24 @@ ${more}`);
         return null;
       }
     };
-    let obj = tryParse(text);
-    if (!obj) {
+    let objUnknown = tryParse(text);
+    if (!objUnknown) {
       const start = text.indexOf("{");
       const end = text.lastIndexOf("}");
       if (start >= 0 && end > start) {
-        obj = tryParse(text.slice(start, end + 1));
+        objUnknown = tryParse(text.slice(start, end + 1));
       }
     }
-    if (!obj || typeof obj !== "object") {
+    if (!isRecord(objUnknown)) {
       throw new AIError("Gemini unified content parse error: non-JSON output", { provider: "Gemini" });
     }
+    const obj = objUnknown;
     const titleObj = obj.title || {};
-    const subject = (titleObj.subject || "").toString();
-    const type = titleObj.type ? String(titleObj.type) : void 0;
-    const scope = titleObj.scope ? String(titleObj.scope) : void 0;
-    const conventional = titleObj.conventional ? String(titleObj.conventional) : void 0;
-    const description = (obj.description || "").toString();
+    const subject = isString(titleObj.subject) ? titleObj.subject : String(titleObj.subject ?? "");
+    const type = isString(titleObj.type) ? titleObj.type : void 0;
+    const scope = isString(titleObj.scope) ? titleObj.scope : void 0;
+    const conventional = isString(titleObj.conventional) ? titleObj.conventional : void 0;
+    const description = isString(obj.description) ? obj.description : String(obj.description ?? "");
     const title = (conventional || subject || "").toString().trim();
     return {
       title,

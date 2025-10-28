@@ -1,4 +1,4 @@
-import { Content, GenerateContentRequest, Part } from '@google/generative-ai';
+import { Content, GenerateContentRequest, ObjectSchema, Part, SchemaType } from '@google/generative-ai';
 
 export const PROMPT_PREVIEW_LIMIT = 2000;
 
@@ -20,9 +20,32 @@ export function buildContinuationParts(previousOutput: string, prompt: string): 
 }
 
 export function buildGenerateRequest(params: { userText: string; temperature: number; maxOutputTokens: number }): GenerateContentRequest {
+  // Enforce JSON mode with an explicit schema for the unified object
+  const schema: ObjectSchema = {
+    type: SchemaType.OBJECT,
+    properties: {
+      title: {
+        type: SchemaType.OBJECT,
+        properties: {
+          subject: { type: SchemaType.STRING },
+          type: { type: SchemaType.STRING, nullable: true },
+          scope: { type: SchemaType.STRING, nullable: true },
+          conventional: { type: SchemaType.STRING },
+        },
+        required: ['subject', 'conventional'],
+      },
+      description: { type: SchemaType.STRING },
+    },
+    required: ['title', 'description'],
+  };
   return {
     contents: [ { role: 'user', parts: [{ text: params.userText }] } ],
-    generationConfig: { temperature: params.temperature, maxOutputTokens: params.maxOutputTokens },
+    generationConfig: {
+      temperature: params.temperature,
+      maxOutputTokens: params.maxOutputTokens,
+      responseMimeType: 'application/json',
+      responseSchema: schema,
+    },
   };
 }
 
@@ -66,6 +89,7 @@ export function buildUnifiedPRPrompt(params: UnifiedPRPromptParams): string {
     `- Keep it simple and reviewer-friendly.\n` +
     `- Avoid code snippets or images.\n` +
     `- Add some fun with emojis from [${allowedEmojis}] only: at most one emoji per item, and at most 3 total.\n` +
+    `- Use max 5 items; each ≤ 12 words; total ≤ 180 words.\n` +
     (creator ? `- Thank **${creator}** for the contribution! 🎉\n` : '') +
     `\n` +
     `Context:\n` +
