@@ -25701,17 +25701,6 @@ var PullRequestUpdater = class {
     this.octokit = (0, import_github.getOctokit)(githubToken);
     this.updateTitle = ((0, import_core.getInput)("update_title") || "").toLowerCase() === "true";
   }
-  previewStr(text, max = 400) {
-    try {
-      return (text || "").slice(0, max).replace(/\n/g, "\\n");
-    } catch {
-      return "";
-    }
-  }
-  sanitizeTitle(title) {
-    const cleaned = (title || "").replace(/^#+\s*/, "").replace(/^[`'"]+|[`'"]+$/g, "").trim().replace(/\s+/g, " ").replace(/[\.!?]+$/g, "");
-    return cleaned;
-  }
   parseConventionalCommit(title) {
     const re = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(?:\(([^)]+)\))?:\s*(.+)$/i;
     const m = title.match(re);
@@ -25725,57 +25714,8 @@ var PullRequestUpdater = class {
     console.log("[Title] parse", { input: title, parsed });
     return parsed;
   }
-  chooseScopeFromFiles(files) {
-    if (!files || files.length === 0) return void 0;
-    const candidates = {};
-    const bump = (k) => {
-      if (!k) return;
-      candidates[k] = (candidates[k] || 0) + 1;
-    };
-    for (const f of files) {
-      const parts = f.split("/").filter(Boolean);
-      if (parts[0] === ".github") {
-        bump("ci");
-        continue;
-      }
-      if (parts.length === 1) {
-        bump("root");
-        continue;
-      }
-      if (parts[0] === "apps" && parts[1]) {
-        bump(parts[1]);
-        continue;
-      }
-      if (parts[0] === "packages" && parts[1]) {
-        bump(parts[1]);
-        continue;
-      }
-      if (["backend", "frontend", "server", "client", "api", "web", "app"].includes(parts[0])) {
-        bump(parts[0]);
-        continue;
-      }
-      if (parts[0] === "src" && parts[1]) {
-        bump(parts[1]);
-        continue;
-      }
-      bump(parts[0]);
-    }
-    let best;
-    let bestCount = 0;
-    for (const [k, v] of Object.entries(candidates)) {
-      if (v > bestCount) {
-        best = k;
-        bestCount = v;
-      }
-    }
-    if (!best) return void 0;
-    const total = files.length;
-    if (bestCount / total < 0.5 || Object.keys(candidates).length > 3) {
-      return "monorepo";
-    }
-    if (best === "root") return "repo";
-    return best;
-  }
+  /**
+   * Picks a scope from the changed files, preferring a monorepo scope if changes span many areas.   */
   chooseScopeFromFilesWithMonorepo(files) {
     if (!files || files.length === 0) return void 0;
     const hasApps = files.some((f) => /^apps\//.test(f));
@@ -25835,6 +25775,9 @@ var PullRequestUpdater = class {
     console.log("[Title] scope -> best", { scope: best, total, bestCount, candidates });
     return best;
   }
+  /**
+   * Converts a sentence into imperative mood by lemmatizing the first verb-like token.
+   */
   toImperative(subject) {
     if (!subject) return subject;
     let s = subject.trim().replace(/\s+/g, " ").replace(/[\.!?]+$/g, "");
@@ -25886,6 +25829,9 @@ var PullRequestUpdater = class {
     s = s.slice(0, startIdx) + base + s.slice(startIdx + word.length);
     return s;
   }
+  /**
+   * Converts to imperative and logs the transformation when it changes the input.
+   */
   toImperativeWithLog(subject) {
     const result = this.toImperative(subject);
     if (result !== subject) {
@@ -25893,41 +25839,9 @@ var PullRequestUpdater = class {
     }
     return result;
   }
-  inferCommitType(diffOutput, files, currentTitle, subject) {
-    const lowerAll = (s) => (s || "").toLowerCase();
-    const d = lowerAll(diffOutput);
-    const t = lowerAll(currentTitle + " " + subject);
-    const isDocsFile = (f) => /(^docs\/|\.md$|README\.[^/]*$)/i.test(f);
-    const isTestFile = (f) => /(\.test\.|\.spec\.|__tests__\/|^tests\/)/i.test(f);
-    const isCiFile = (f) => /(^\.github\/|^\.circleci\/|gitlab-ci\.yml$|azure-pipelines\.yml$)/i.test(f);
-    const isBuildFile = (f) => /(^Dockerfile$|docker-compose|^turbo\.json$|^pnpm-workspace\.ya?ml$|^package\.json$|^vite\.config|^webpack\.config|^rollup\.config|^tsconfig\.json$|babel|^Makefile$)/i.test(f);
-    const isStyleFile = (f) => /(\.css$|\.scss$|\.sass$|\.less$)/i.test(f);
-    const isCodeFile = (f) => /(\.ts$|\.tsx$|\.js$|\.jsx$|\.py$|\.go$|\.rb$|\.rs$|\.java$|\.php$)/i.test(f);
-    const every = (pred) => files.length > 0 && files.every(pred);
-    const some = (pred) => files.some(pred);
-    if (files.length > 0) {
-      if (every(isDocsFile)) return "docs";
-      if (every(isTestFile)) return "test";
-      if (every(isCiFile)) return "ci";
-      if (every(isBuildFile)) return "build";
-      if (every(isStyleFile)) return "style";
-    }
-    if (/\bfix(e[sd]|ing)?\b|\bbug\b|\berror\b|\bissue\b|\bcorrect\b/.test(d) || /\bfix\b/.test(t)) {
-      return "fix";
-    }
-    if (/\brefactor(ing|ed|s)?\b|\bcleanup\b|\brename\b|\brestructure\b/.test(d) || /\brefactor\b/.test(t)) {
-      return "refactor";
-    }
-    if (/\bperf(ormance)?\b|\boptimi[sz]e\b|\bfaster\b|\bspeed\b/.test(d + " " + t)) {
-      return "perf";
-    }
-    if (some(isCiFile) && !some(isCodeFile)) return "ci";
-    if (some(isBuildFile) && !some(isCodeFile)) return "build";
-    if (some(isDocsFile) && !some(isCodeFile)) return "docs";
-    if (some(isTestFile) && !some(isCodeFile)) return "test";
-    if (some(isCodeFile)) return "feat";
-    return "chore";
-  }
+  /**
+   * Monorepo-aware scoring-based commit type inference from diff and file types.
+   */
   inferCommitTypeScored(diffOutput, files, currentTitle, subject) {
     const lowerAll = (s) => (s || "").toLowerCase();
     const d = lowerAll(diffOutput);
@@ -25977,34 +25891,69 @@ var PullRequestUpdater = class {
     console.log("[Title] infer (scored) -> result", { bestType, scores });
     return bestType;
   }
+  /**
+   * Formats a Conventional Commit title using AI suggestions (subject) and local heuristics (type/scope),
+   * enforcing imperative form and ≤72 characters total length.
+   */
   formatConventionalCommitTitle(subject, diffOutput, files, currentTitle) {
     const parsed = this.parseConventionalCommitWithLog(subject);
     let type = parsed.type;
     let scope = parsed.scope;
     let bareSubject = parsed.type ? parsed.subject : subject;
     console.log("[Title] format -> initial", { subject, parsed, currentTitle });
-    if (!type) {
-      type = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
+    const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
+    const recommendedScope = this.chooseScopeFromFilesWithMonorepo(files);
+    const allowedTypes = /* @__PURE__ */ new Set(["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore"]);
+    if (!type || !allowedTypes.has(type)) {
+      type = recommendedType;
+    } else {
+      if (type === "fix" && recommendedType === "feat") type = "feat";
+      if (type === "chore" && recommendedType === "feat") type = "feat";
     }
     if (!scope) {
-      scope = this.chooseScopeFromFilesWithMonorepo(files) || void 0;
+      scope = recommendedScope || void 0;
+    } else if (recommendedScope === "monorepo") {
+      scope = "monorepo";
     }
     bareSubject = bareSubject.replace(/\s*#\d+\s*$/g, "").trim();
     bareSubject = this.toImperativeWithLog(bareSubject);
     const prefix = `${type}${scope ? `(${scope})` : ""}: `;
-    const maxLen = 200;
-    const allowedSubjectLen = Math.max(0, maxLen - prefix.length);
-    let finalSubject = bareSubject.length > allowedSubjectLen ? bareSubject.slice(0, allowedSubjectLen).trim() : bareSubject;
+    const MAX_TITLE_LENGTH = 72;
+    const allowedSubjectLen = Math.max(0, MAX_TITLE_LENGTH - prefix.length);
+    let finalSubject = bareSubject.length > allowedSubjectLen ? this.shortenSubject(bareSubject, allowedSubjectLen) : bareSubject;
     finalSubject = finalSubject.replace(/[\.!?]+$/g, "");
     const finalTitle = `${prefix}${finalSubject}`;
     console.log("[Title] format -> final", { type, scope, prefix, allowedSubjectLen, finalSubject, finalTitle });
     return finalTitle;
   }
+  /**
+   * Attempts to shorten a subject line more intelligently than a hard slice.
+   */
+  shortenSubject(subject, maxLen) {
+    let s = subject.trim();
+    s = s.replace(/\s*#\d+\s*$/g, "").trim();
+    if (s.length > maxLen) s = s.replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+    const stopWords = /* @__PURE__ */ new Set(["the", "a", "an", "initial", "basic", "simple", "various", "misc", "minor"]);
+    if (s.length > maxLen) {
+      const parts = s.split(/\s+/);
+      const filtered = [];
+      for (const w of parts) {
+        if (!stopWords.has(w.toLowerCase())) filtered.push(w);
+        if (filtered.join(" ").length >= maxLen) break;
+      }
+      const joined = filtered.join(" ").trim();
+      if (joined.length > 0) s = joined;
+    }
+    if (s.length > maxLen) s = s.slice(0, maxLen).trim();
+    return s;
+  }
+  /** Executes the full update workflow: diff -> AI generation -> format -> GitHub updates. */
   async run() {
     try {
       this.validateEventContext();
-      const pullRequestNumber = this.context.payload.pull_request.number;
-      const creator = this.context.payload.pull_request.user.login;
+      const prCtx = this.getPullRequestFromContext();
+      const pullRequestNumber = prCtx.number;
+      const creator = prCtx.user.login;
       const { baseBranch, headBranch } = this.extractBranchRefs();
       this.gitHelper.setupGitConfiguration();
       await this.gitHelper.fetchGitBranches(baseBranch, headBranch);
@@ -26016,7 +25965,7 @@ var PullRequestUpdater = class {
       core3.endGroup();
       core3.startGroup("AI Generation");
       core3.info("[PR] calling AI to generate title and description");
-      const currentTitle = this.context.payload.pull_request.title || "";
+      const currentTitle = prCtx.title || "";
       const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator });
       core3.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
       core3.info(`[PR] AI description content:
@@ -26043,15 +25992,18 @@ ${content.description}`);
       core3.setFailed(errorMessage);
     }
   }
+  /** Validates that the current action is triggered by a pull_request event. */
   validateEventContext() {
     if (this.context.eventName !== "pull_request") {
       (0, import_core.setFailed)("This action should only runs on pull_request events.");
       throw new Error("Invalid event context");
     }
   }
+  /** Extracts base/head branch names from the action context for the current PR. */
   extractBranchRefs() {
-    const baseBranch = this.context.payload.pull_request.base.ref;
-    const headBranch = this.context.payload.pull_request.head.ref;
+    const prCtx = this.getPullRequestFromContext();
+    const baseBranch = prCtx.base.ref;
+    const headBranch = prCtx.head.ref;
     core3.info(`Base branch: ${baseBranch}`);
     core3.info(`Head branch: ${headBranch}`);
     return { baseBranch, headBranch };
@@ -26081,17 +26033,27 @@ ${generatedDescription}`);
       throw error3;
     }
   }
+  /**
+   * Safely extracts the pull_request payload the action was triggered with.
+   * Throws if required fields are missing.
+   */
+  getPullRequestFromContext() {
+    const pr = this.context?.payload?.pull_request;
+    if (!pr || typeof pr.number !== "number" || !pr.user?.login || !pr.base?.ref || !pr.head?.ref) {
+      throw new Error("Missing or invalid pull_request context payload");
+    }
+    return pr;
+  }
+  /** Fetches the current PR details (title/body) from GitHub. */
   async fetchPullRequestDetails(pullRequestNumber) {
     const { data } = await this.octokit.rest.pulls.get({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       pull_number: pullRequestNumber
     });
-    return data;
+    return { title: data.title ?? void 0, body: data.body ?? void 0 };
   }
-  extractBranchName() {
-    return this.context.payload.pull_request.head.ref.replace("feat/", "").replace("fix/", "");
-  }
+  /** Posts a comment preserving the original PR title and description. */
   async postOriginalPullRequestComment(pullRequestNumber, currentTitle, currentDescription) {
     core3.info("Creating comment with original title and description...");
     await this.octokit.rest.issues.createComment({
@@ -26106,6 +26068,7 @@ ${currentDescription}`
     });
     core3.info("Comment created successfully.");
   }
+  /** Applies the new PR description (and optional title) to GitHub. */
   async applyPullRequestUpdate(pullRequestNumber, newDescription, newTitle) {
     core3.info(`Updating PR description${newTitle ? "and title" : ""}...`);
     const params = {
