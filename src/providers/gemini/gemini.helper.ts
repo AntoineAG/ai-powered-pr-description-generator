@@ -1,10 +1,10 @@
 import { EnhancedGenerateContentResponse, FinishReason, GenerateContentRequest, GenerateContentResult, GenerativeModel, GoogleGenerativeAI, UsageMetadata } from '@google/generative-ai';
-import { AIError } from '../../core/errors/ai.error';
-import { ModelCache } from '../../core/utils/cache';
-import { buildContinuationParts, buildGenerateRequest, buildUserPromptText, previewText, PROMPT_PREVIEW_LIMIT } from '../../core/prompt/prompt.builder';
-import { generateWithRetry } from '../../core/utils/retry';
-import { AIHelperInterface, GeminiConfig, Logger } from '../../core/types';
 import { buildUsageDiagnostics } from '../../core/diagnostics/usage-diagnostics';
+import { AIError } from '../../core/errors/ai.error';
+import { buildContinuationParts, buildGenerateRequest, buildUnifiedPRPrompt, buildUserPromptText, previewText, PROMPT_PREVIEW_LIMIT } from '../../core/prompt/prompt.builder';
+import { AIHelperInterface, GeminiConfig, GeneratePRParams, Logger, PullRequestContentResult } from '../../core/types';
+import { ModelCache } from '../../core/utils/cache';
+import { generateWithRetry } from '../../core/utils/retry';
 
 class GeminiAIHelper implements AIHelperInterface {
   private readonly cache: ModelCache<GenerativeModel>;
@@ -26,20 +26,21 @@ class GeminiAIHelper implements AIHelperInterface {
     });
   }
 
-  async createPullRequestDescription(_diffOutput: string, prompt: string): Promise<string> {
+  async generatePullRequestContent(diffOutput: string, params?: GeneratePRParams): Promise<PullRequestContentResult> {
     try {
       const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
       const supportsSystem = GeminiAIHelper.supportsSystemInstruction(modelName);
-      const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
+      const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator });
+      const promptPreview = previewText(unifiedPrompt, PROMPT_PREVIEW_LIMIT);
 
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Request`);
       this.logger.info(`[AI][Gemini] model=${modelName} temperature=${temperature} maxOutputTokens=${maxOutputTokens}`);
-      this.logger.info(`[AI][Gemini] promptLength=${prompt.length}`);
+      this.logger.info(`[AI][Gemini] promptLength=${unifiedPrompt.length}`);
       this.logger.info(`[AI][Gemini] promptPreview:\n${promptPreview}`);
       this.logger.endGroup();
 
-      const userText = buildUserPromptText(systemText, prompt, supportsSystem);
+      const userText = buildUserPromptText(systemText, unifiedPrompt, supportsSystem);
       const payload = buildGenerateRequest({ userText, temperature, maxOutputTokens });
 
       const retryOutcome = await generateWithRetry<GenerateContentResult>(
@@ -58,8 +59,8 @@ class GeminiAIHelper implements AIHelperInterface {
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Response`);
       this.logger.info(`[AI][Gemini] finishReason=${finishReason}`);
-      this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      this.logger.info(`[AI][Gemini] description:\n${text}`);
+      this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} rawLength=${text.length}`);
+      this.logger.info(`[AI][Gemini] raw:\n${text}`);
       this.logger.endGroup();
 
       const diag = buildUsageDiagnostics(usage, text);
@@ -89,7 +90,7 @@ class GeminiAIHelper implements AIHelperInterface {
         } else {
           this.logger.info('[AI][Gemini] continuation: MAX_TOKENS with non-empty output, requesting continuation...');
           const contPayload: GenerateContentRequest = {
-            contents: buildContinuationParts(text, prompt),
+            contents: buildContinuationParts(text, unifiedPrompt),
             generationConfig: { temperature, maxOutputTokens },
           };
           const cont = await this.cache.getOrBuild(retryOutcome.modelUsed).generateContent(contPayload);
@@ -101,8 +102,9 @@ class GeminiAIHelper implements AIHelperInterface {
           text = (text + '\n\n' + more).trim();
         }
       }
-
-      return text;
+      const parsed = this.parseUnifiedContent(text);
+      this.logger.info(`[AI][Gemini] content: titleLength=${parsed.title.length} descLength=${parsed.description.length}`);
+      return parsed;
     } catch (error) {
       const status = (error as any)?.status as number | undefined;
       const msg = (error as any)?.message ? String((error as any).message) : String(error);
@@ -125,6 +127,38 @@ class GeminiAIHelper implements AIHelperInterface {
       try { return resp.text()?.trim?.() || ''; } catch { /* ignore */ }
     }
     return buf.join('').trim();
+  }
+
+  private parseUnifiedContent(text: string): PullRequestContentResult {
+    const tryParse = (s: string) => { try { return JSON.parse(s); } catch { return null; } };
+    let obj: any = tryParse(text);
+    if (!obj) {
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start >= 0 && end > start) {
+        obj = tryParse(text.slice(start, end + 1));
+      }
+    }
+    if (!obj || typeof obj !== 'object') {
+      throw new AIError('Gemini unified content parse error: non-JSON output', { provider: 'Gemini' });
+    }
+    const titleObj = obj.title || {};
+    const subject: string = (titleObj.subject || '').toString();
+    const type: string | undefined = titleObj.type ? String(titleObj.type) : undefined;
+    const scope: string | undefined = titleObj.scope ? String(titleObj.scope) : undefined;
+    const conventional: string | undefined = titleObj.conventional ? String(titleObj.conventional) : undefined;
+    const description: string = (obj.description || '').toString();
+
+    const title: string = (conventional || subject || '').toString().trim();
+    return {
+      title,
+      description: description || '',
+      meta: {
+        type: type || undefined,
+        scope: scope || undefined,
+        subject: subject || undefined,
+      },
+    };
   }
 }
 

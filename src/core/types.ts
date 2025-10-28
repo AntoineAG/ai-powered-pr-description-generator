@@ -1,5 +1,16 @@
+export interface GeneratePRParams {
+  currentTitle?: string;
+  creator?: string;
+}
+
+export interface PullRequestContentResult {
+  title: string;
+  description: string;
+  meta?: { type?: string; scope?: string; subject?: string };
+}
+
 export interface AIHelperInterface {
-  createPullRequestDescription: (diffOutput: string, prompt: string) => Promise<string>
+  generatePullRequestContent: (diffOutput: string, params?: GeneratePRParams) => Promise<PullRequestContentResult>
 }
 
 export interface AIHelperParams {

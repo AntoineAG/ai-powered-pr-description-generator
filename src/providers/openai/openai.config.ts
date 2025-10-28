@@ -5,7 +5,7 @@ export function buildOpenAIConfig(aiParams: AIHelperParams, options?: { systemTe
   const providerDefaults = {
     model: (aiParams.model || 'gpt-4.1').trim(),
     temperature: aiParams.temperature,
-    systemText: (options?.systemText || 'You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions.').trim(),
+    systemText: (options?.systemText || 'You are a senior code reviewer who writes excellent pull request titles and descriptions. Titles must follow Conventional Commits (type(scope): subject) in imperative mood and <=72 chars. Descriptions must be clear, Markdown-formatted, reviewer-friendly. Always output strict JSON as requested.').trim(),
   };
   const common = buildProviderCommonConfig({ ...providerDefaults, retry: { modelLadder: options?.modelLadder } });
   return {
@@ -14,4 +14,3 @@ export function buildOpenAIConfig(aiParams: AIHelperParams, options?: { systemTe
     ...common,
   };
 }
-

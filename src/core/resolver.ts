@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import { buildGeminiConfig } from '../providers/gemini/gemini.config';
-import { buildOpenAIConfig } from '../providers/openai/openai.config';
 import GeminiAIHelper from '../providers/gemini/gemini.helper';
+import { buildOpenAIConfig } from '../providers/openai/openai.config';
 import OpenAIHelper from '../providers/openai/openai.helper';
 import { AIHelperInterface, AIHelperParams, Logger } from './types';
 

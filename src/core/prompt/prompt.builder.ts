@@ -26,3 +26,49 @@ export function buildGenerateRequest(params: { userText: string; temperature: nu
   };
 }
 
+export interface UnifiedPRPromptParams {
+  diff: string;
+  currentTitle?: string;
+  creator?: string;
+}
+
+/**
+ * Builds a unified prompt asking the model to produce both a PR title and description
+ * in a strict JSON format. The prompt merges previous title/description guidance
+ * while remaining provider-agnostic.
+ */
+export function buildUnifiedPRPrompt(params: UnifiedPRPromptParams): string {
+  const { diff, currentTitle, creator } = params;
+  const allowedEmojis = '🚀 🎉 👍 👏 🔥';
+  return (
+    `You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.\n\n` +
+    `Output format:\n` +
+    `- Output STRICT JSON only (no code fences, no commentary).\n` +
+    `- Fields:\n` +
+    `  {\n` +
+    `    "title": {\n` +
+    `      "subject": string,\n` +
+    `      "type": string | null,\n` +
+    `      "scope": string | null,\n` +
+    `      "conventional": string\n` +
+    `    },\n` +
+    `    "description": string\n` +
+    `  }\n\n` +
+    `Title rules:\n` +
+    `- Write in Conventional Commit format: type(scope): subject.\n` +
+    `- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.\n` +
+    `- 6–12 words; maximum 72 characters.\n` +
+    `- If a current title exists, improve it slightly if useful.\n\n` +
+    `Description rules:\n` +
+    `- Markdown format. Begin with a subtitle: "## What this PR does?"\n` +
+    `- Numbered list of key changes. Do not paste the raw diff.\n` +
+    `- Keep it simple and reviewer-friendly.\n` +
+    `- Avoid code snippets or images.\n` +
+    `- Add some fun with emojis from [${allowedEmojis}] only: at most one emoji per item, and at most 3 total.\n` +
+    (creator ? `- Thank **${creator}** for the contribution! 🎉\n` : '') +
+    `\n` +
+    `Context:\n` +
+    (currentTitle ? `Current title: ${currentTitle}\n` : '') +
+    `Diff:\n${diff}`
+  );
+}

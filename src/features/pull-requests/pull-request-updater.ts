@@ -33,41 +33,6 @@ class PullRequestUpdater {
     try { return (text || '').slice(0, max).replace(/\n/g, '\\n'); } catch { return ''; }
   }
 
-  private generatePrompt(diffOutput: string, creator: string): string {
-    return `Instructions:
-    Please generate a Pull Request description for the provided diff, following these guidelines:
-    - Start with a subtitle "## What this PR does?".
-    - Format your response in Markdown.
-    - Exclude the PR title (e.g., "feat: xxx", "fix: xxx", "Refactor: xxx").
-    - Do not include the diff in the PR description.
-    - Provide a simple description of the changes.
-    - Avoid code snippets or images.
-    - Add some fun with emojis! Use only the following: 🚀🎉👍👏🔥. List changes using numbers, with a maximum of one emoji per item. Limit the total to 3 emojis. Example: 
-      1. Added a new feature👏 
-      2. Fixed a bug👍 
-      3. Major refactor🚀.
-    - Thank **${creator}** for the contribution! 🎉
-  
-    Diff:
-    ${diffOutput}`;
-  }
-
-  private generateTitlePrompt(diffOutput: string, currentTitle: string): string {
-    return `You are helping write a precise, concise Pull Request title.
-
-Rules:
-- Output ONLY the title text, nothing else.
-- Use imperative mood, present tense.
-- 6-12 words, max 72 characters.
-- No emojis, no code fences, no quotes, no trailing punctuation.
-- Summarize the main changes from the diff. If the current title is already great, improve it slightly.
-
-Current title: ${currentTitle}
-
-Diff:
-${diffOutput}`;
-  }
-
   private sanitizeTitle(title: string): string {
     const cleaned = (title || '')
       .replace(/^#+\s*/, '') // strip markdown heading
@@ -75,7 +40,8 @@ ${diffOutput}`;
       .trim()
       .replace(/\s+/g, ' ')
       .replace(/[\.!?]+$/g, ''); // strip trailing punctuation
-    return cleaned.length > 72 ? cleaned.slice(0, 72).trim() : cleaned;
+    // return cleaned.length > 72 ? cleaned.slice(0, 72).trim() : cleaned;
+    return cleaned;
   }
 
   private parseConventionalCommit(title: string): { type?: string; scope?: string; subject: string } {
@@ -344,49 +310,41 @@ ${diffOutput}`;
       this.gitHelper.setupGitConfiguration();
       await this.gitHelper.fetchGitBranches(baseBranch, headBranch);
 
-      // Get the diff and generate the PR description
+      // Get the diff and generate PR content (title + description)
       core.startGroup('Diff and Prompt');
       const diffOutput = this.gitHelper.getGitDiff(baseBranch, headBranch);
       core.info(`[PR-Description] diff length=${diffOutput.length}`);
       const changedFiles = this.gitHelper.getChangedFiles(baseBranch, headBranch);
       console.log('[Title] changed files', { count: changedFiles.length, files: changedFiles });
-      const prompt = this.generatePrompt(diffOutput, creator);
-      core.info(`[PR-Description] prompt length=${prompt.length}`);
       core.endGroup();
       core.startGroup('AI Generation');
-      core.info('[PR-Description] calling AI to generate description');
-      const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
-      core.info(`[PR-Description] AI description length=${generatedDescription.length}`);
-      core.info(`[PR-Description] AI description content:\n${generatedDescription}`);
+      core.info('[PR] calling AI to generate title and description');
+      const currentTitle = this.context.payload.pull_request.title || '';
+      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator });
+      core.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
+      core.info(`[PR] AI description content:\n${content.description}`);
       core.endGroup();
 
-      // Optionally generate a new PR title
-      const currentTitle = this.context.payload.pull_request.title || '';
+      // Compute final Conventional Commit title from AI output and local inference
       let generatedTitle: string | undefined;
-      if (this.updateTitle) {
-        const titlePrompt = this.generateTitlePrompt(diffOutput, currentTitle);
-        core.info(`[Title] title prompt prepared`);
-        const rawTitle = await this.aiHelper.createPullRequestDescription(diffOutput, titlePrompt);
-        core.info(`[Title] raw AI title ${rawTitle}`);
-        const cleaned = this.sanitizeTitle(rawTitle);
-        core.info(`[Title] cleaned AI title ${cleaned}`);
-        generatedTitle = this.formatConventionalCommitTitle(cleaned, diffOutput, changedFiles, currentTitle);
-        core.info(`[Title] generated title (formatted) ${generatedTitle}`);
-      }
+      const baseTitleForFormatting = (content.title || content.meta?.subject || '').trim();
+      const formatted = this.formatConventionalCommitTitle(baseTitleForFormatting, diffOutput, changedFiles, currentTitle);
+      core.info(`[Title] generated title (formatted) ${formatted}`);
+      if (this.updateTitle) generatedTitle = formatted;
 
       // Update the pull request description
       core.startGroup('PR Update');
       core.info(`[PR-Description] updating pull request #${pullRequestNumber}`);
       await this.updatePullRequestDescription(
       pullRequestNumber,
-      generatedDescription,
+      content.description,
       generatedTitle
       );
       core.endGroup();
 
       // Set outputs for GitHub Actions
       setOutput('pr_number', pullRequestNumber.toString());
-      setOutput('description', generatedDescription);
+      setOutput('description', content.description);
       core.info(`Successfully updated PR #${pullRequestNumber} description.`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
