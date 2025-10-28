@@ -23920,26 +23920,11 @@ function buildGeminiConfig(aiParams, options) {
   const providerDefaults = {
     model: (aiParams.model || "gemini-2.5-flash").trim(),
     temperature: aiParams.temperature,
-    systemText: (options?.systemText || "You are very good at reviewing code and can generate pull request descriptions.").trim()
+    systemText: (options?.systemText || "You are a senior code reviewer who writes excellent pull request titles and descriptions. Titles must follow Conventional Commits (type(scope): subject) in imperative mood and <=72 chars. Descriptions must be clear, Markdown-formatted, reviewer-friendly. Always output strict JSON as requested.").trim()
   };
   const common = buildProviderCommonConfig(providerDefaults);
   return {
     apiKey: aiParams.apiKey,
-    ...common
-  };
-}
-
-// src/providers/openai/openai.config.ts
-function buildOpenAIConfig(aiParams, options) {
-  const providerDefaults = {
-    model: (aiParams.model || "gpt-4.1").trim(),
-    temperature: aiParams.temperature,
-    systemText: (options?.systemText || "You are a super assistant, very good at reviewing code, and can generate the best pull request descriptions.").trim()
-  };
-  const common = buildProviderCommonConfig({ ...providerDefaults, retry: { modelLadder: options?.modelLadder } });
-  return {
-    apiKey: aiParams.apiKey,
-    baseUrl: options?.baseUrl,
     ...common
   };
 }
@@ -24951,6 +24936,45 @@ var GoogleGenerativeAI = class {
   }
 };
 
+// src/core/diagnostics/usage-diagnostics.ts
+function buildUsageDiagnostics(usage, text) {
+  const num = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
+  const u = usage || {};
+  const prompt = num(u.promptTokenCount);
+  const candidates = num(u.candidatesTokenCount);
+  const total = num(u.totalTokenCount);
+  const outputTotal = Math.max(0, total - prompt);
+  const approxVisibleRaw = Math.max(0, Math.ceil((text || "").length / 4));
+  const visibleApprox = Math.min(approxVisibleRaw, outputTotal);
+  let thoughts = 0;
+  let inferenceNote = null;
+  const thoughtsReported = num(u.thoughtsTokenCount);
+  if (thoughtsReported > 0) {
+    thoughts = Math.min(thoughtsReported, outputTotal);
+  } else if (candidates > 0) {
+    thoughts = Math.max(0, Math.min(candidates - visibleApprox, outputTotal));
+    inferenceNote = "estimated from candidates \u2212 visible";
+  } else {
+    thoughts = Math.max(0, outputTotal - visibleApprox);
+    if (outputTotal > 0) {
+      inferenceNote = "inferred from (total \u2212 prompt) \u2212 visible";
+    }
+  }
+  const denom = Math.max(1, outputTotal);
+  const thoughtsRatio = thoughts / denom;
+  const visibleRatio = Math.max(0, 1 - thoughtsRatio);
+  return {
+    promptTokens: prompt,
+    candidateTokens: candidates,
+    totalTokens: total,
+    visibleTokensApprox: visibleApprox,
+    thoughtsTokens: thoughts,
+    thoughtsRatio,
+    visibleRatio,
+    inferenceNote
+  };
+}
+
 // src/core/errors/ai.error.ts
 var AIError = class _AIError extends Error {
   constructor(message, meta, cause) {
@@ -24961,21 +24985,6 @@ var AIError = class _AIError extends Error {
   }
   static wrap(message, meta, cause) {
     return new _AIError(message, meta, cause);
-  }
-};
-
-// src/core/utils/cache.ts
-var ModelCache = class {
-  constructor(builder) {
-    this.builder = builder;
-    this.map = /* @__PURE__ */ new Map();
-  }
-  getOrBuild(name) {
-    const existing = this.map.get(name);
-    if (existing) return existing;
-    const built = this.builder(name);
-    this.map.set(name, built);
-    return built;
   }
 };
 
@@ -25003,6 +25012,58 @@ function buildGenerateRequest(params) {
     generationConfig: { temperature: params.temperature, maxOutputTokens: params.maxOutputTokens }
   };
 }
+function buildUnifiedPRPrompt(params) {
+  const { diff, currentTitle, creator } = params;
+  const allowedEmojis = "\u{1F680} \u{1F389} \u{1F44D} \u{1F44F} \u{1F525}";
+  return `You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.
+
+Output format:
+- Output STRICT JSON only (no code fences, no commentary).
+- Fields:
+  {
+    "title": {
+      "subject": string,
+      "type": string | null,
+      "scope": string | null,
+      "conventional": string
+    },
+    "description": string
+  }
+
+Title rules:
+- Write in Conventional Commit format: type(scope): subject.
+- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.
+- 6\u201312 words; maximum 72 characters.
+- If a current title exists, improve it slightly if useful.
+
+Description rules:
+- Markdown format. Begin with a subtitle: "## What this PR does?"
+- Numbered list of key changes. Do not paste the raw diff.
+- Keep it simple and reviewer-friendly.
+- Avoid code snippets or images.
+- Add some fun with emojis from [${allowedEmojis}] only: at most one emoji per item, and at most 3 total.
+` + (creator ? `- Thank **${creator}** for the contribution! \u{1F389}
+` : "") + `
+Context:
+` + (currentTitle ? `Current title: ${currentTitle}
+` : "") + `Diff:
+${diff}`;
+}
+
+// src/core/utils/cache.ts
+var ModelCache = class {
+  constructor(builder) {
+    this.builder = builder;
+    this.map = /* @__PURE__ */ new Map();
+  }
+  getOrBuild(name) {
+    const existing = this.map.get(name);
+    if (existing) return existing;
+    const built = this.builder(name);
+    this.map.set(name, built);
+    return built;
+  }
+};
 
 // src/core/utils/retry.ts
 var defaultRetryClassifier = {
@@ -25061,45 +25122,6 @@ async function generateWithRetry(task, options, classifier = defaultRetryClassif
   throw new Error(`[AI][${provider}] Exhausted retry attempts after ${elapsed}ms`);
 }
 
-// src/core/diagnostics/usage-diagnostics.ts
-function buildUsageDiagnostics(usage, text) {
-  const num = (n) => typeof n === "number" && Number.isFinite(n) ? n : 0;
-  const u = usage || {};
-  const prompt = num(u.promptTokenCount);
-  const candidates = num(u.candidatesTokenCount);
-  const total = num(u.totalTokenCount);
-  const outputTotal = Math.max(0, total - prompt);
-  const approxVisibleRaw = Math.max(0, Math.ceil((text || "").length / 4));
-  const visibleApprox = Math.min(approxVisibleRaw, outputTotal);
-  let thoughts = 0;
-  let inferenceNote = null;
-  const thoughtsReported = num(u.thoughtsTokenCount);
-  if (thoughtsReported > 0) {
-    thoughts = Math.min(thoughtsReported, outputTotal);
-  } else if (candidates > 0) {
-    thoughts = Math.max(0, Math.min(candidates - visibleApprox, outputTotal));
-    inferenceNote = "estimated from candidates \u2212 visible";
-  } else {
-    thoughts = Math.max(0, outputTotal - visibleApprox);
-    if (outputTotal > 0) {
-      inferenceNote = "inferred from (total \u2212 prompt) \u2212 visible";
-    }
-  }
-  const denom = Math.max(1, outputTotal);
-  const thoughtsRatio = thoughts / denom;
-  const visibleRatio = Math.max(0, 1 - thoughtsRatio);
-  return {
-    promptTokens: prompt,
-    candidateTokens: candidates,
-    totalTokens: total,
-    visibleTokensApprox: visibleApprox,
-    thoughtsTokens: thoughts,
-    thoughtsRatio,
-    visibleRatio,
-    inferenceNote
-  };
-}
-
 // src/providers/gemini/gemini.helper.ts
 var GeminiAIHelper = class _GeminiAIHelper {
   constructor(params) {
@@ -25114,19 +25136,20 @@ var GeminiAIHelper = class _GeminiAIHelper {
       });
     });
   }
-  async createPullRequestDescription(_diffOutput, prompt) {
+  async generatePullRequestContent(diffOutput, params) {
     try {
       const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
       const supportsSystem = _GeminiAIHelper.supportsSystemInstruction(modelName);
-      const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
+      const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator });
+      const promptPreview = previewText(unifiedPrompt, PROMPT_PREVIEW_LIMIT);
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Request`);
       this.logger.info(`[AI][Gemini] model=${modelName} temperature=${temperature} maxOutputTokens=${maxOutputTokens}`);
-      this.logger.info(`[AI][Gemini] promptLength=${prompt.length}`);
+      this.logger.info(`[AI][Gemini] promptLength=${unifiedPrompt.length}`);
       this.logger.info(`[AI][Gemini] promptPreview:
 ${promptPreview}`);
       this.logger.endGroup();
-      const userText = buildUserPromptText(systemText, prompt, supportsSystem);
+      const userText = buildUserPromptText(systemText, unifiedPrompt, supportsSystem);
       const payload = buildGenerateRequest({ userText, temperature, maxOutputTokens });
       const retryOutcome = await generateWithRetry(
         async (activeModelName) => {
@@ -25142,8 +25165,8 @@ ${promptPreview}`);
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Response`);
       this.logger.info(`[AI][Gemini] finishReason=${finishReason}`);
-      this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} descLength=${text.length}`);
-      this.logger.info(`[AI][Gemini] description:
+      this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} rawLength=${text.length}`);
+      this.logger.info(`[AI][Gemini] raw:
 ${text}`);
       this.logger.endGroup();
       const diag = buildUsageDiagnostics(usage, text);
@@ -25172,7 +25195,7 @@ ${text}`);
         } else {
           this.logger.info("[AI][Gemini] continuation: MAX_TOKENS with non-empty output, requesting continuation...");
           const contPayload = {
-            contents: buildContinuationParts(text, prompt),
+            contents: buildContinuationParts(text, unifiedPrompt),
             generationConfig: { temperature, maxOutputTokens }
           };
           const cont = await this.cache.getOrBuild(retryOutcome.modelUsed).generateContent(contPayload);
@@ -25185,7 +25208,9 @@ ${more}`);
           text = (text + "\n\n" + more).trim();
         }
       }
-      return text;
+      const parsed = this.parseUnifiedContent(text);
+      this.logger.info(`[AI][Gemini] content: titleLength=${parsed.title.length} descLength=${parsed.description.length}`);
+      return parsed;
     } catch (error3) {
       const status = error3?.status;
       const msg = error3?.message ? String(error3.message) : String(error3);
@@ -25210,8 +25235,59 @@ ${more}`);
     }
     return buf.join("").trim();
   }
+  parseUnifiedContent(text) {
+    const tryParse = (s) => {
+      try {
+        return JSON.parse(s);
+      } catch {
+        return null;
+      }
+    };
+    let obj = tryParse(text);
+    if (!obj) {
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start >= 0 && end > start) {
+        obj = tryParse(text.slice(start, end + 1));
+      }
+    }
+    if (!obj || typeof obj !== "object") {
+      throw new AIError("Gemini unified content parse error: non-JSON output", { provider: "Gemini" });
+    }
+    const titleObj = obj.title || {};
+    const subject = (titleObj.subject || "").toString();
+    const type = titleObj.type ? String(titleObj.type) : void 0;
+    const scope = titleObj.scope ? String(titleObj.scope) : void 0;
+    const conventional = titleObj.conventional ? String(titleObj.conventional) : void 0;
+    const description = (obj.description || "").toString();
+    const title = (conventional || subject || "").toString().trim();
+    return {
+      title,
+      description: description || "",
+      meta: {
+        type: type || void 0,
+        scope: scope || void 0,
+        subject: subject || void 0
+      }
+    };
+  }
 };
 var gemini_helper_default = GeminiAIHelper;
+
+// src/providers/openai/openai.config.ts
+function buildOpenAIConfig(aiParams, options) {
+  const providerDefaults = {
+    model: (aiParams.model || "gpt-4.1").trim(),
+    temperature: aiParams.temperature,
+    systemText: (options?.systemText || "You are a senior code reviewer who writes excellent pull request titles and descriptions. Titles must follow Conventional Commits (type(scope): subject) in imperative mood and <=72 chars. Descriptions must be clear, Markdown-formatted, reviewer-friendly. Always output strict JSON as requested.").trim()
+  };
+  const common = buildProviderCommonConfig({ ...providerDefaults, retry: { modelLadder: options?.modelLadder } });
+  return {
+    apiKey: aiParams.apiKey,
+    baseUrl: options?.baseUrl,
+    ...common
+  };
+}
 
 // src/providers/openai/openai.helper.ts
 var OpenAIHelper = class {
@@ -25219,13 +25295,14 @@ var OpenAIHelper = class {
     this.config = params.config;
     this.logger = params.logger;
   }
-  async createPullRequestDescription(_diffOutput, prompt) {
+  async generatePullRequestContent(diffOutput, params) {
     const { model, temperature, systemText } = this.config;
-    const promptPreview = previewText(prompt, PROMPT_PREVIEW_LIMIT);
+    const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator });
+    const promptPreview = previewText(unifiedPrompt, PROMPT_PREVIEW_LIMIT);
     try {
       this.logger.info(`[AI][OpenAI] ::group::Request`);
       this.logger.info(`[AI][OpenAI] model=${model} temperature=${temperature}`);
-      this.logger.info(`[AI][OpenAI] promptLength=${prompt.length}`);
+      this.logger.info(`[AI][OpenAI] promptLength=${unifiedPrompt.length}`);
       this.logger.info(`[AI][OpenAI] promptPreview:
 ${promptPreview}`);
       this.logger.info(`::endgroup::`);
@@ -25240,7 +25317,7 @@ ${promptPreview}`);
             model: activeModel,
             messages: [
               { role: "system", content: systemText },
-              { role: "user", content: prompt }
+              { role: "user", content: unifiedPrompt }
             ],
             temperature,
             max_tokens: this.config.maxOutputTokens
@@ -25267,16 +25344,16 @@ ${promptPreview}`);
         initialModel: model,
         retry: this.config.retry
       });
-      let description = (retryOutcome.value.choices?.[0]?.message?.content || "").trim();
+      let text = (retryOutcome.value.choices?.[0]?.message?.content || "").trim();
       const finishReason = retryOutcome.value.choices?.[0]?.finish_reason || retryOutcome.value.choices?.[0]?.finishReason;
       const usage = retryOutcome.value.usage || {};
       this.logger.info(`[AI][OpenAI] ::group::Response`);
       this.logger.info(`[AI][OpenAI] finishReason=${finishReason}`);
-      this.logger.info(`[AI][OpenAI] usage=${JSON.stringify(usage)} descLength=${description.length}`);
-      this.logger.info(`[AI][OpenAI] description:
-${description}`);
+      this.logger.info(`[AI][OpenAI] usage=${JSON.stringify(usage)} rawLength=${text.length}`);
+      this.logger.info(`[AI][OpenAI] raw:
+${text}`);
       this.logger.info(`::endgroup::`);
-      const diag = buildUsageDiagnostics(usage, description);
+      const diag = buildUsageDiagnostics(usage, text);
       this.logger.info(`[AI][OpenAI] ::group::Usage Diagnostics`);
       this.logger.info(`[AI][OpenAI] prompt=${diag.promptTokens} total=${diag.totalTokens} output=${Math.max(0, diag.totalTokens - diag.promptTokens)} candidates=${diag.candidateTokens}`);
       if (diag.inferenceNote) this.logger.info(`[AI][OpenAI] notes=${diag.inferenceNote}`);
@@ -25294,8 +25371,8 @@ ${description}`);
             model,
             messages: [
               { role: "system", content: systemText },
-              { role: "user", content: prompt },
-              { role: "assistant", content: description },
+              { role: "user", content: unifiedPrompt },
+              { role: "assistant", content: text },
               { role: "user", content: "Continue from where you left off. Do not repeat earlier content. Keep the same structure and style." }
             ],
             temperature,
@@ -25315,18 +25392,56 @@ ${description}`);
           this.logger.info(`[AI][OpenAI] Continuation finishReason=${fr2} moreLength=${more.length}`);
           this.logger.info(`[AI][OpenAI] more:
 ${more}`);
-          description = (description + "\n\n" + more).trim();
+          text = (text + "\n\n" + more).trim();
         } else {
           this.logger.warn(`[AI][OpenAI] continuation failed status=${contResp.status} body=${contRaw}`);
         }
       }
-      return description;
+      const parsed = this.parseUnifiedContent(text);
+      this.logger.info(`[AI][OpenAI] content: titleLength=${parsed.title.length} descLength=${parsed.description.length}`);
+      return parsed;
     } catch (error3) {
       const status = error3?.statusCode || error3?.status;
       const msg = error3?.message ? String(error3.message) : String(error3);
       this.logger.error(`[AI][OpenAI] \u274C exception status=${status ?? "n/a"} message=${msg}`);
       throw AIError.wrap(`OpenAI API Error: ${msg}`, { provider: "OpenAI", statusCode: status });
     }
+  }
+  parseUnifiedContent(text) {
+    const tryParse = (s) => {
+      try {
+        return JSON.parse(s);
+      } catch {
+        return null;
+      }
+    };
+    let obj = tryParse(text);
+    if (!obj) {
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start >= 0 && end > start) {
+        obj = tryParse(text.slice(start, end + 1));
+      }
+    }
+    if (!obj || typeof obj !== "object") {
+      throw new AIError("OpenAI unified content parse error: non-JSON output", { provider: "OpenAI" });
+    }
+    const titleObj = obj.title || {};
+    const subject = (titleObj.subject || "").toString();
+    const type = titleObj.type ? String(titleObj.type) : void 0;
+    const scope = titleObj.scope ? String(titleObj.scope) : void 0;
+    const conventional = titleObj.conventional ? String(titleObj.conventional) : void 0;
+    const description = (obj.description || "").toString();
+    const title = (conventional || subject || "").toString().trim();
+    return {
+      title,
+      description: description || "",
+      meta: {
+        type: type || void 0,
+        scope: scope || void 0,
+        subject: subject || void 0
+      }
+    };
   }
 };
 var openai_helper_default = OpenAIHelper;
@@ -25419,42 +25534,9 @@ var PullRequestUpdater = class {
       return "";
     }
   }
-  generatePrompt(diffOutput, creator) {
-    return `Instructions:
-    Please generate a Pull Request description for the provided diff, following these guidelines:
-    - Start with a subtitle "## What this PR does?".
-    - Format your response in Markdown.
-    - Exclude the PR title (e.g., "feat: xxx", "fix: xxx", "Refactor: xxx").
-    - Do not include the diff in the PR description.
-    - Provide a simple description of the changes.
-    - Avoid code snippets or images.
-    - Add some fun with emojis! Use only the following: \u{1F680}\u{1F389}\u{1F44D}\u{1F44F}\u{1F525}. List changes using numbers, with a maximum of one emoji per item. Limit the total to 3 emojis. Example: 
-      1. Added a new feature\u{1F44F} 
-      2. Fixed a bug\u{1F44D} 
-      3. Major refactor\u{1F680}.
-    - Thank **${creator}** for the contribution! \u{1F389}
-  
-    Diff:
-    ${diffOutput}`;
-  }
-  generateTitlePrompt(diffOutput, currentTitle) {
-    return `You are helping write a precise, concise Pull Request title.
-
-Rules:
-- Output ONLY the title text, nothing else.
-- Use imperative mood, present tense.
-- 6-12 words, max 72 characters.
-- No emojis, no code fences, no quotes, no trailing punctuation.
-- Summarize the main changes from the diff. If the current title is already great, improve it slightly.
-
-Current title: ${currentTitle}
-
-Diff:
-${diffOutput}`;
-  }
   sanitizeTitle(title) {
     const cleaned = (title || "").replace(/^#+\s*/, "").replace(/^[`'"]+|[`'"]+$/g, "").trim().replace(/\s+/g, " ").replace(/[\.!?]+$/g, "");
-    return cleaned.length > 72 ? cleaned.slice(0, 72).trim() : cleaned;
+    return cleaned;
   }
   parseConventionalCommit(title) {
     const re = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(?:\(([^)]+)\))?:\s*(.+)$/i;
@@ -25736,7 +25818,7 @@ ${diffOutput}`;
     bareSubject = bareSubject.replace(/\s*#\d+\s*$/g, "").trim();
     bareSubject = this.toImperativeWithLog(bareSubject);
     const prefix = `${type}${scope ? `(${scope})` : ""}: `;
-    const maxLen = 72;
+    const maxLen = 200;
     const allowedSubjectLen = Math.max(0, maxLen - prefix.length);
     let finalSubject = bareSubject.length > allowedSubjectLen ? bareSubject.slice(0, allowedSubjectLen).trim() : bareSubject;
     finalSubject = finalSubject.replace(/[\.!?]+$/g, "");
@@ -25757,38 +25839,30 @@ ${diffOutput}`;
       core3.info(`[PR-Description] diff length=${diffOutput.length}`);
       const changedFiles = this.gitHelper.getChangedFiles(baseBranch, headBranch);
       console.log("[Title] changed files", { count: changedFiles.length, files: changedFiles });
-      const prompt = this.generatePrompt(diffOutput, creator);
-      core3.info(`[PR-Description] prompt length=${prompt.length}`);
       core3.endGroup();
       core3.startGroup("AI Generation");
-      core3.info("[PR-Description] calling AI to generate description");
-      const generatedDescription = await this.aiHelper.createPullRequestDescription(diffOutput, prompt);
-      core3.info(`[PR-Description] AI description length=${generatedDescription.length}`);
-      core3.info(`[PR-Description] AI description content:
-${generatedDescription}`);
-      core3.endGroup();
+      core3.info("[PR] calling AI to generate title and description");
       const currentTitle = this.context.payload.pull_request.title || "";
+      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator });
+      core3.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
+      core3.info(`[PR] AI description content:
+${content.description}`);
+      core3.endGroup();
       let generatedTitle;
-      if (this.updateTitle) {
-        const titlePrompt = this.generateTitlePrompt(diffOutput, currentTitle);
-        core3.info(`[Title] title prompt prepared`);
-        const rawTitle = await this.aiHelper.createPullRequestDescription(diffOutput, titlePrompt);
-        core3.info(`[Title] raw AI title ${rawTitle}`);
-        const cleaned = this.sanitizeTitle(rawTitle);
-        core3.info(`[Title] cleaned AI title ${cleaned}`);
-        generatedTitle = this.formatConventionalCommitTitle(cleaned, diffOutput, changedFiles, currentTitle);
-        core3.info(`[Title] generated title (formatted) ${generatedTitle}`);
-      }
+      const baseTitleForFormatting = (content.title || content.meta?.subject || "").trim();
+      const formatted = this.formatConventionalCommitTitle(baseTitleForFormatting, diffOutput, changedFiles, currentTitle);
+      core3.info(`[Title] generated title (formatted) ${formatted}`);
+      if (this.updateTitle) generatedTitle = formatted;
       core3.startGroup("PR Update");
       core3.info(`[PR-Description] updating pull request #${pullRequestNumber}`);
       await this.updatePullRequestDescription(
         pullRequestNumber,
-        generatedDescription,
+        content.description,
         generatedTitle
       );
       core3.endGroup();
       (0, import_core.setOutput)("pr_number", pullRequestNumber.toString());
-      (0, import_core.setOutput)("description", generatedDescription);
+      (0, import_core.setOutput)("description", content.description);
       core3.info(`Successfully updated PR #${pullRequestNumber} description.`);
     } catch (error3) {
       const errorMessage = error3 instanceof Error ? error3.message : "Unknown error";
