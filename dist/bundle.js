@@ -25910,9 +25910,11 @@ ${content.description}`);
     try {
       const pullRequest = await this.fetchPullRequestDetails(pullRequestNumber);
       const currentDescription = pullRequest.body || "";
+      const currentTitle = pullRequest.title || "";
       if (currentDescription) {
-        await this.postOriginalDescriptionComment(
+        await this.postOriginalPullRequestComment(
           pullRequestNumber,
+          currentTitle,
           currentDescription
         );
       }
@@ -25940,13 +25942,15 @@ ${generatedDescription}`);
   extractBranchName() {
     return this.context.payload.pull_request.head.ref.replace("feat/", "").replace("fix/", "");
   }
-  async postOriginalDescriptionComment(pullRequestNumber, currentDescription) {
-    core3.info("Creating comment with original description...");
+  async postOriginalPullRequestComment(pullRequestNumber, currentTitle, currentDescription) {
+    core3.info("Creating comment with original title and description...");
     await this.octokit.rest.issues.createComment({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       issue_number: pullRequestNumber,
-      body: `**Original description**:
+      body: `**Original title**: ${currentTitle}
+
+**Original description**:
 
 ${currentDescription}`
     });

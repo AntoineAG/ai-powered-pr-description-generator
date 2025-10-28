@@ -376,11 +376,13 @@ class PullRequestUpdater {
       // Fetch pull request details
       const pullRequest = await this.fetchPullRequestDetails(pullRequestNumber);
       const currentDescription = pullRequest.body || '';
+      const currentTitle = pullRequest.title || '';
 
       // Post a comment with the original description if it exists
       if (currentDescription) {
-        await this.postOriginalDescriptionComment(
+        await this.postOriginalPullRequestComment(
           pullRequestNumber,
+          currentTitle,
           currentDescription
         );
       }
@@ -415,16 +417,17 @@ class PullRequestUpdater {
       .replace("fix/", "");
   }
 
-  async postOriginalDescriptionComment(
+  async postOriginalPullRequestComment(
     pullRequestNumber: number,
+    currentTitle: string,
     currentDescription: string
   ) {
-    core.info('Creating comment with original description...');
+    core.info('Creating comment with original title and description...');
     await this.octokit.rest.issues.createComment({
       owner: this.context.repo.owner,
       repo: this.context.repo.repo,
       issue_number: pullRequestNumber,
-      body: `**Original description**:\n\n${currentDescription}`
+      body: `**Original title**: ${currentTitle}\n\n**Original description**:\n\n${currentDescription}`
     });
     core.info('Comment created successfully.');
   }
