@@ -49,10 +49,22 @@ inputs:
     description: 'Maximum total words in the description.'
     required: false
     default: '300'
-  allowed_emojis:
-    description: 'Comma-separated emojis allowed in description list.'
+  allow_title_emojis:
+    description: 'If true, title MUST include exactly one emoji (from allowed_emojis_titles). If false, title MUST include none.'
     required: false
-    default: '🚀,✨,🎉,✅,👍,👏,🔥,⚡️,🐛,🩹,🚑️,♻️,🧹,🧼,🧽,🧰,🔧,🔨,⚙️,🧱,🏗️,🚧,🤖,👷,📦,📌,🔗,⬆️,⬇️,📈,📊,🔍️,🔎,🔊,🔇,📝,📚,📄,🧾,✏️,🎨,💄,🖌️,🖼️,♿️,🌐,🔒,🔐,🛡️,🔑,💥,⏪️,🔀,🚚,🐳,💬,🚩,🏷️,🔖,💚,📱,🖥️,🔌,💡,🧪,🔬,🗑️,💾,🗂️,🗃️,📡,👀'
+    default: 'true'
+  allow_description_emojis:
+    description: 'If true, description MAY include emojis (from allowed_emojis_descriptions). If false, none allowed.'
+    required: false
+    default: 'true'
+  allowed_emojis_titles:
+    description: 'Comma-separated list for titles (strict 12)'
+    required: false
+    default: '✨,🐛,♻️,⚡️,🔥,🚀,📝,🔧,🏗️,🔒️,✅,🎉'
+  allowed_emojis_descriptions:
+    description: 'Comma-separated list for descriptions (wider set)'
+    required: false
+    default: '✨,🐛,♻️,⚡️,🔥,🚀,📝,🔧,🏗️,🔒️,✅,🎉,⬆️,⬇️,📦️,📈,🧪,🗑️,👷,🚧,📌,➕,➖,🔨,🌐,✏️,⏪️,🔀,👽️,🚚,📄,💥,🍱,♿️,💡,💬,🗃️,🔊,🔇,👥,🚸,📱,🤡,🙈,📸,⚗️,🔍️,🏷️,🌱,🚩,🥅,💫,🛂,🩹,🧐,⚰️,🧱,🧑‍💻,💸,🧵,🦺,✈️'
 outputs:
   description:
     description: 'The AI-generated description for the pull request, providing context and details for reviewers.'

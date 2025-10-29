@@ -58,57 +58,84 @@ class PullRequestUpdater {
         const githubToken = (0, core_1.getInput)('github_token', { required: true }).trim();
         this.octokit = (0, github_1.getOctokit)(githubToken);
         this.updateTitle = ((0, core_1.getInput)('update_title') || '').toLowerCase() === 'true';
-        // Read and validate prompt limits from inputs
-        this.limits = this.readPromptLimitsFromInputs();
-        core.info(`[PR] limits ${JSON.stringify(this.limits)}`);
+        // Read and validate prompt rules from inputs
+        this.rules = this.readRulesFromInputs();
+        core.info(`[PR] rules ${JSON.stringify(this.rules)}`);
     }
     clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
     parseIntOrDefault(raw, fallback, nameForLog, min, max) {
         const s = (raw || '').trim();
         const v = Number.parseInt(s, 10);
         if (!Number.isFinite(v)) {
-            core.warning(`[PR][limits] ${nameForLog} invalid ('${raw ?? ''}'); using default ${fallback}`);
+            core.warning(`[PR][rules] ${nameForLog} invalid ('${raw ?? ''}'); using default ${fallback}`);
             return fallback;
         }
         const clamped = this.clamp(v, min, max);
         if (clamped !== v) {
-            core.warning(`[PR][limits] ${nameForLog} out of range (${v}); clamped to ${clamped}`);
+            core.warning(`[PR][rules] ${nameForLog} out of range (${v}); clamped to ${clamped}`);
         }
         return clamped;
     }
-    readPromptLimitsFromInputs() {
+    readRulesFromInputs() {
         // Defaults mirror action.yml defaults
         const DEFAULTS = {
             titleMaxLen: 120,
             descMaxItems: 5,
             descMaxWordsPerItem: 25,
             descMaxTotalWords: 300,
-            allowedEmojis: [
-                '🚀', '✨', '🎉', '✅', '👍', '👏', '🔥', '⚡️', '🐛', '🩹', '🚑️', '♻️', '🧹', '🧼', '🧽', '🧰', '🔧', '🔨', '⚙️', '🧱', '🏗️', '🚧', '🤖', '👷', '📦', '📌', '🔗', '⬆️', '⬇️', '📈', '📊', '🔍️', '🔎', '🔊', '🔇', '📝', '📚', '📄', '🧾', '✏️', '🎨', '💄', '🖌️', '🖼️', '♿️', '🌐', '🔒', '🔐', '🛡️', '🔑', '💥', '⏪️', '🔀', '🚚', '🐳', '💬', '🚩', '🏷️', '🔖', '💚', '📱', '🖥️', '🔌', '💡', '🧪', '🔬', '🗑️', '💾', '🗂️', '🗃️', '📡', '👀'
-            ],
+            // Emoji rules defaults
+            allowTitleEmojis: true,
+            allowDescriptionEmojis: true,
+            titleEmojis: ['✨', '🐛', '♻️', '⚡️', '🔥', '🚀', '📝', '🔧', '🏗️', '🔒️', '✅', '🎉'],
+            descriptionEmojis: ['✨', '🐛', '♻️', '⚡️', '🔥', '🚀', '📝', '🔧', '🏗️', '🔒️', '✅', '🎉', '⬆️', '⬇️', '📦️', '📈', '🧪', '🗑️', '👷', '🚧', '📌', '➕', '➖', '🔨', '🌐', '✏️', '⏪️', '🔀', '👽️', '🚚', '📄', '💥', '🍱', '♿️', '💡', '💬', '🗃️', '🔊', '🔇', '👥', '🚸', '📱', '🤡', '🙈', '📸', '⚗️', '🔍️', '🏷️', '🌱', '🚩', '🥅', '💫', '🛂', '🩹', '🧐', '⚰️', '🧱', '🧑‍💻', '💸', '🧵', '🦺', '✈️'],
         };
         const titleRaw = (0, core_1.getInput)('title_max_len');
         const itemsRaw = (0, core_1.getInput)('desc_max_items');
         const wordsPerItemRaw = (0, core_1.getInput)('desc_max_words_per_item');
         const totalWordsRaw = (0, core_1.getInput)('desc_max_total_words');
-        const emojisRaw = (0, core_1.getInput)('allowed_emojis');
+        const allowTitleEmojisRaw = (0, core_1.getInput)('allow_title_emojis');
+        const allowDescEmojisRaw = (0, core_1.getInput)('allow_description_emojis');
+        const titleEmojisRaw = (0, core_1.getInput)('allowed_emojis_titles');
+        const descEmojisRaw = (0, core_1.getInput)('allowed_emojis_descriptions');
         const titleMaxLen = this.parseIntOrDefault(titleRaw, DEFAULTS.titleMaxLen, 'title_max_len', 1, 300);
         const descMaxItems = this.parseIntOrDefault(itemsRaw, DEFAULTS.descMaxItems, 'desc_max_items', 1, 50);
         const descMaxWordsPerItem = this.parseIntOrDefault(wordsPerItemRaw, DEFAULTS.descMaxWordsPerItem, 'desc_max_words_per_item', 1, 100);
         const descMaxTotalWords = this.parseIntOrDefault(totalWordsRaw, DEFAULTS.descMaxTotalWords, 'desc_max_total_words', 1, 2000);
-        const allowedEmojis = (emojisRaw || DEFAULTS.allowedEmojis.join(','))
+        const parseBool = (raw, fallback) => {
+            const s = (raw || '').trim().toLowerCase();
+            if (['true', '1', 'yes', 'y'].includes(s))
+                return true;
+            if (['false', '0', 'no', 'n'].includes(s))
+                return false;
+            if (s)
+                core.warning(`[PR][rules] boolean value invalid ('${raw}'); using default ${fallback}`);
+            return fallback;
+        };
+        const allowTitleEmojis = parseBool(allowTitleEmojisRaw, DEFAULTS.allowTitleEmojis);
+        const allowDescriptionEmojis = parseBool(allowDescEmojisRaw, DEFAULTS.allowDescriptionEmojis);
+        const titleEmojis = (titleEmojisRaw || DEFAULTS.titleEmojis.join(','))
             .split(',')
             .map(s => s.trim())
             .filter(Boolean);
-        if (allowedEmojis.length === 0) {
-            core.warning('[PR][limits] allowed_emojis is empty; using defaults');
+        if (titleEmojis.length === 0) {
+            core.warning('[PR][rules] allowed_emojis_titles is empty; using defaults');
+        }
+        const descriptionEmojis = (descEmojisRaw || DEFAULTS.descriptionEmojis.join(','))
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+        if (descriptionEmojis.length === 0) {
+            core.warning('[PR][rules] allowed_emojis_descriptions is empty; using defaults');
         }
         return {
             titleMaxLen,
             descMaxItems,
             descMaxWordsPerItem,
             descMaxTotalWords,
-            allowedEmojis: allowedEmojis.length > 0 ? allowedEmojis : [...DEFAULTS.allowedEmojis],
+            allowTitleEmojis,
+            allowDescriptionEmojis,
+            titleEmojis: titleEmojis.length > 0 ? titleEmojis : [...DEFAULTS.titleEmojis],
+            descriptionEmojis: descriptionEmojis.length > 0 ? descriptionEmojis : [...DEFAULTS.descriptionEmojis],
         };
     }
     parseConventionalCommit(title) {
@@ -298,6 +325,8 @@ class PullRequestUpdater {
         let type = parsed.type;
         let scope = parsed.scope;
         let bareSubject = parsed.type ? parsed.subject : subject;
+        // If the AI included a leading emoji and/or conventional prefix inside the subject, remove it
+        bareSubject = this.stripLeadingConventionalPrefix(bareSubject);
         core.debug(`[Title] format -> initial ${JSON.stringify({ subject, parsed, currentTitle })}`);
         // Determine a recommended type/scope from local heuristics
         const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
@@ -326,12 +355,69 @@ class PullRequestUpdater {
         bareSubject = this.toImperativeWithLog(bareSubject);
         const prefix = `${type}${scope ? `(${scope})` : ''}: `;
         // Enforce Conventional Commits guidance (<= 72 chars total)
-        const allowedSubjectLen = Math.max(0, this.limits.titleMaxLen - prefix.length);
+        const allowedSubjectLen = Math.max(0, this.rules.titleMaxLen - prefix.length);
         let finalSubject = bareSubject.length > allowedSubjectLen ? this.shortenSubject(bareSubject, allowedSubjectLen) : bareSubject;
         finalSubject = finalSubject.replace(/[\.!?]+$/g, '');
-        const finalTitle = `${prefix}${finalSubject}`;
+        // Emoji enforcement in title
+        let finalTitle;
+        if (this.rules.allowTitleEmojis) {
+            const allowed = this.rules.titleEmojis || [];
+            const found = this.findFirstAllowedEmoji(subject, allowed);
+            const chosen = found || this.pickEmojiForTypeFromAllowed(type, allowed) || allowed[0];
+            const cleanSubject = this.removeAllEmojis(finalSubject).trim();
+            finalTitle = (chosen ? `${chosen} ${prefix}${cleanSubject}` : `${prefix}${cleanSubject}`);
+        }
+        else {
+            // Strip any emojis entirely
+            finalTitle = `${prefix}${this.removeAllEmojis(finalSubject).trim()}`;
+        }
         core.debug(`[Title] format -> final ${JSON.stringify({ type, scope, prefix, allowedSubjectLen, finalSubject, finalTitle })}`);
         return finalTitle;
+    }
+    stripLeadingConventionalPrefix(s) {
+        if (!s)
+            return s;
+        // Remove optional leading emojis and a conventional prefix like feat(scope):
+        const re = /^(?:\p{Extended_Pictographic}+\s*)?(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(?:\([^)]*\))?:\s*/iu;
+        return s.replace(re, '').trim();
+    }
+    removeAllEmojis(s) {
+        if (!s)
+            return s;
+        // Remove extended pictographic chars (covers most emojis) and VS16/ZWJ remnants
+        return s.replace(/\p{Extended_Pictographic}/gu, '').replace(/[\uFE0E\uFE0F\u200D]/g, '');
+    }
+    findFirstAllowedEmoji(s, allowed) {
+        if (!s || !allowed?.length)
+            return undefined;
+        let bestIdx = Number.POSITIVE_INFINITY;
+        let best;
+        for (const e of allowed) {
+            const idx = s.indexOf(e);
+            if (idx >= 0 && idx < bestIdx) {
+                bestIdx = idx;
+                best = e;
+            }
+        }
+        return best;
+    }
+    pickEmojiForTypeFromAllowed(type, allowed) {
+        if (!allowed?.length)
+            return undefined;
+        const prefer = (...candidates) => candidates.find(c => allowed.includes(c));
+        switch ((type || '').toLowerCase()) {
+            case 'feat': return prefer('✨', '🚀');
+            case 'fix': return prefer('🐛', '🩹');
+            case 'docs': return prefer('📝');
+            case 'refactor': return prefer('♻️');
+            case 'perf': return prefer('⚡️');
+            case 'style': return prefer('💄', '🎨');
+            case 'test': return prefer('✅', '🧪');
+            case 'build': return prefer('🏗️', '🔧', '📦️');
+            case 'ci': return prefer('👷', '🔧');
+            case 'chore': return prefer('🧹', '🔧');
+            default: return allowed[0];
+        }
     }
     /**
      * Attempts to shorten a subject line more intelligently than a hard slice.
@@ -387,7 +473,7 @@ class PullRequestUpdater {
             core.info('[PR] calling AI to generate title and description');
             const currentTitle = prCtx.title || '';
             //const diffForPrompt = diffOutput.length > 50000 ? this.buildDiffSummary(changedFiles, diffOutput) : diffOutput;
-            const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, limits: this.limits });
+            const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, rules: this.rules });
             core.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
             const preview = (content.description || '').slice(0, 400);
             core.info(`[PR] AI description preview:\n${preview}${content.description.length > 400 ? '...' : ''}`);

@@ -1,15 +1,20 @@
-export type PromptLimits = {
+export type PRContentRules = {
+  // Title/description sizing
   titleMaxLen: number;
   descMaxItems: number;
   descMaxWordsPerItem: number;
   descMaxTotalWords: number;
-  allowedEmojis: string[];
+  // Emoji usage rules
+  allowTitleEmojis: boolean;
+  allowDescriptionEmojis: boolean;
+  titleEmojis: string[];
+  descriptionEmojis: string[];
 };
 
 export interface GeneratePRParams {
   currentTitle?: string;
   creator?: string;
-  limits?: PromptLimits;
+  rules?: PRContentRules;
 }
 
 export interface PullRequestContentResult {

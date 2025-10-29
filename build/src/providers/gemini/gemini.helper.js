@@ -31,7 +31,7 @@ class GeminiAIHelper {
         try {
             const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
             const supportsSystem = GeminiAIHelper.supportsSystemInstruction(modelName);
-            const unifiedPrompt = (0, prompt_builder_1.buildUnifiedPRPrompt)({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, limits: params?.limits });
+            const unifiedPrompt = (0, prompt_builder_1.buildUnifiedPRPrompt)({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, rules: params?.rules });
             const promptPreview = (0, prompt_builder_1.previewText)(unifiedPrompt, prompt_builder_1.PROMPT_PREVIEW_LIMIT);
             this.logger.info(`[AI][Gemini]`);
             this.logger.startGroup(`Request`);
@@ -108,7 +108,7 @@ class GeminiAIHelper {
                 this.logger.info('[AI][Gemini] continuation: truncated JSON detected; requesting JSON tail only...');
                 const retryOutcome3 = await (0, retry_1.generateWithRetry)(async (activeModelName) => {
                     const model = this.cache.getOrBuild(activeModelName);
-                    const contPayload = this.buildTailContinuationRequest(partialDescUnescaped, temperature, tailMax, params?.limits);
+                    const contPayload = this.buildTailContinuationRequest(partialDescUnescaped, temperature, tailMax, params?.rules);
                     return model.generateContent(contPayload);
                 }, { logger: this.logger, provider: 'Gemini', initialModel: retryOutcome.modelUsed, retry: this.config.retry });
                 const contResp = retryOutcome3.value.response;
@@ -220,7 +220,7 @@ class GeminiAIHelper {
         out = out.replace(/\\t/g, '\t'); // \t -> tab
         return out;
     }
-    buildTailContinuationRequest(prefix, temperature, maxOutputTokens, limits) {
+    buildTailContinuationRequest(prefix, temperature, maxOutputTokens, rules) {
         const excerpt = prefix.length > DESC_EXCERPT_CHARS ? prefix.slice(-DESC_EXCERPT_CHARS) : prefix;
         const tailSchema = {
             type: generative_ai_1.SchemaType.OBJECT,
@@ -240,7 +240,7 @@ class GeminiAIHelper {
             '- Keep the same style and structure (continue the Markdown list if it was started).',
             '- Do not re-emit the "title".',
             '- No code fences, no commentary.',
-            `- Stay within the original limits: max ${limits?.descMaxItems ?? 5} items, each ≤ ${limits?.descMaxWordsPerItem ?? 25} words, total ≤ ${limits?.descMaxTotalWords ?? 300} words.`,
+            `- Stay within the original limits: max ${rules?.descMaxItems ?? 5} items, each ≤ ${rules?.descMaxWordsPerItem ?? 25} words, total ≤ ${rules?.descMaxTotalWords ?? 300} words.`,
         ].join('\n');
         const contextMsg = 'Here is the last ' + String(DESC_EXCERPT_CHARS) + ' characters of the description you already produced:\n' + excerpt;
         return {

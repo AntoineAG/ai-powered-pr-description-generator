@@ -71,7 +71,12 @@ Optional environment variables:
  - `desc_max_items` (optional): Max number of bullet items in the description. Default: `5`.
  - `desc_max_words_per_item` (optional): Max words per bullet item. Default: `25`.
  - `desc_max_total_words` (optional): Max total words in the description. Default: `300`.
- - `allowed_emojis` (optional): Comma-separated list of allowed emojis for list items. Default includes a large curated set useful for PRs (features, fixes, docs, tests, CI/CD, perf, security, cleanup, UI, deps, etc.). See `action.yml` for the full default list.
+ - Emoji configuration:
+   - `allow_title_emojis` (optional): If `true`, title MUST include exactly one emoji from `allowed_emojis_titles` at the very start. If `false`, title MUST include none. Default: `true`.
+   - `allow_description_emojis` (optional): If `true`, description MAY include emojis (from `allowed_emojis_descriptions`), at most one per item. If `false`, none allowed. Default: `true`.
+   - `allowed_emojis_titles` (optional): Comma-separated list for titles (strict 12). Default provided in `action.yml`.
+   - `allowed_emojis_descriptions` (optional): Comma-separated list for descriptions (wider set). Default provided in `action.yml`.
+   - Note: Emoji meanings are guided by a Gitmoji legend and embedded in the prompt to help the model pick the right one.
 
 
 ## Usage
@@ -110,7 +115,10 @@ jobs:
           desc_max_items: 4
           desc_max_words_per_item: 25
           desc_max_total_words: 300
-          allowed_emojis: "🚀,👍"
+          allow_title_emojis: true
+          allow_description_emojis: true
+          allowed_emojis_titles: "✨,🐛,♻️,⚡️,🔥,🚀,📝,🔧,🏗️,🔒️,✅,🎉"
+          allowed_emojis_descriptions: "✨,🐛,♻️,⚡️,🔥,🚀,📝,🔧,🏗️,🔒️,✅,🎉,⬆️,⬇️,📦️,📈,🧪,🗑️,👷,🚧,📌,➕,➖,🔨,🌐,✏️,⏪️,🔀,👽️,🚚,📄,💥,🍱,♿️,💡,💬,🗃️,🔊,🔇,👥,🚸,📱,🤡,🙈,📸,⚗️,🔍️,🏷️,🌱,🚩,🥅,💫,🛂,🩹,🧐,⚰️,🧱,🧑‍💻,💸,🧵,🦺,✈️"
           api_key: ${{ secrets.GEMINI_API_KEY }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           temperature: "0.4"

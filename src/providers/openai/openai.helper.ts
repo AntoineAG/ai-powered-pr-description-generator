@@ -15,7 +15,7 @@ class OpenAIHelper implements AIHelperInterface {
 
   async generatePullRequestContent(diffOutput: string, params?: GeneratePRParams): Promise<PullRequestContentResult> {
     const { model, temperature, systemText } = this.config;
-    const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, limits: params?.limits! });
+    const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, rules: params?.rules! });
     const promptPreview = previewText(unifiedPrompt, PROMPT_PREVIEW_LIMIT);
     try {
       this.logger.info(`[AI][OpenAI] ::group::Request`);

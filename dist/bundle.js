@@ -24988,6 +24988,79 @@ var AIError = class _AIError extends Error {
   }
 };
 
+// src/core/gitmoji-legend.ts
+var GITMOJI_LEGEND = {
+  "\u{1F3A8}": "Improve structure/format of the code",
+  "\u26A1\uFE0F": "Improve performance",
+  "\u{1F525}": "Remove code or files",
+  "\u{1F41B}": "Fix a bug",
+  "\u{1F691}\uFE0F": "Critical hotfix",
+  "\u2728": "Introduce new features",
+  "\u{1F4DD}": "Add/update documentation",
+  "\u{1F680}": "Deploy",
+  "\u{1F484}": "Update UI/style files",
+  "\u{1F389}": "Begin a project",
+  "\u2705": "Add/update/pass tests",
+  "\u{1F512}\uFE0F": "Fix security/privacy issues",
+  "\u{1F510}": "Add/update secrets",
+  "\u{1F516}": "Release / tags",
+  "\u{1F6A8}": "Fix compiler/linter warnings",
+  "\u{1F6A7}": "Work in progress",
+  "\u{1F49A}": "Fix CI build",
+  "\u2B07\uFE0F": "Downgrade dependencies",
+  "\u2B06\uFE0F": "Upgrade dependencies",
+  "\u{1F4CC}": "Pin dependencies",
+  "\u{1F477}": "CI build system",
+  "\u{1F4C8}": "Analytics/telemetry",
+  "\u267B\uFE0F": "Refactor code",
+  "\u2795": "Add a dependency",
+  "\u2796": "Remove a dependency",
+  "\u{1F527}": "Config files",
+  "\u{1F528}": "Dev scripts",
+  "\u{1F310}": "i18n/l10n",
+  "\u270F\uFE0F": "Fix typos",
+  "\u23EA\uFE0F": "Revert changes",
+  "\u{1F500}": "Merge branches",
+  "\u{1F4E6}\uFE0F": "Compiled files/packages",
+  "\u{1F47D}\uFE0F": "External API changes",
+  "\u{1F69A}": "Move/rename resources",
+  "\u{1F4C4}": "License",
+  "\u{1F4A5}": "Breaking changes",
+  "\u{1F371}": "Assets",
+  "\u267F\uFE0F": "Accessibility",
+  "\u{1F4A1}": "Comments",
+  "\u{1F4AC}": "Text/literals",
+  "\u{1F5C3}\uFE0F": "Database changes",
+  "\u{1F50A}": "Add/update logs",
+  "\u{1F507}": "Remove logs",
+  "\u{1F465}": "Contributors",
+  "\u{1F6B8}": "UX/usability",
+  "\u{1F4F1}": "Responsive design",
+  "\u{1F921}": "Mocks",
+  "\u{1F648}": ".gitignore",
+  "\u{1F4F8}": "Snapshots",
+  "\u2697\uFE0F": "Experiments",
+  "\u{1F50D}\uFE0F": "SEO",
+  "\u{1F3F7}\uFE0F": "Types",
+  "\u{1F331}": "Seeds",
+  "\u{1F6A9}": "Feature flags",
+  "\u{1F945}": "Catch errors",
+  "\u{1F4AB}": "Animations/transitions",
+  "\u{1F6C2}": "Auth/permissions",
+  "\u{1FA79}": "Simple non-critical fix",
+  "\u{1F9D0}": "Data exploration",
+  "\u26B0\uFE0F": "Remove dead code",
+  "\u{1F9EA}": "Failing test",
+  "\u{1F454}": "Business logic",
+  "\u{1FA7A}": "Healthcheck",
+  "\u{1F9F1}": "Infrastructure",
+  "\u{1F9D1}\u200D\u{1F4BB}": "Developer experience",
+  "\u{1F4B8}": "Sponsorships/money infra",
+  "\u{1F9F5}": "Concurrency",
+  "\u{1F9BA}": "Validation",
+  "\u2708\uFE0F": "Offline support"
+};
+
 // src/core/json/schema.ts
 var UnifiedPRSchema = {
   type: SchemaType.OBJECT,
@@ -25040,7 +25113,15 @@ function buildGenerateRequest(params) {
   };
 }
 function buildUnifiedPRPrompt(params) {
-  const { diff, currentTitle, creator, limits } = params;
+  const { diff, currentTitle, creator, rules } = params;
+  const titleEmojiList = (rules.titleEmojis || []).join(" ");
+  const descEmojiList = (rules.descriptionEmojis || []).join(" ");
+  const legendKeys = Array.from(/* @__PURE__ */ new Set([...rules.titleEmojis || [], ...rules.descriptionEmojis || []]));
+  const legendLines = [];
+  for (const e of legendKeys) {
+    const meaning = GITMOJI_LEGEND[e];
+    if (meaning) legendLines.push(`- ${e} = ${meaning}`);
+  }
   const lines = [
     "You are helping write a precise, concise Pull Request title and a clear, reviewer-friendly description.",
     "",
@@ -25059,8 +25140,9 @@ function buildUnifiedPRPrompt(params) {
     "",
     "Title rules:",
     "- Write in Conventional Commit format: type(scope): subject.",
-    "- Imperative mood, present tense; no trailing punctuation; no quotes; no emojis.",
-    `- 6\u201312 words; maximum ${limits.titleMaxLen} characters.`,
+    "- Imperative mood, present tense; no trailing punctuation; no quotes.",
+    `- 6\u201312 words; maximum ${rules.titleMaxLen} characters.`,
+    rules.allowTitleEmojis ? `- The title MUST include exactly one emoji at the very start, chosen from: [${titleEmojiList}]. Format: <emoji> type(scope): subject.` : "- The title MUST NOT include any emoji.",
     "- If a current title exists, improve it slightly if useful.",
     "",
     "Description rules:",
@@ -25069,10 +25151,14 @@ function buildUnifiedPRPrompt(params) {
     "- Numbered list of key changes. Do not paste the raw diff.",
     "- Keep it simple and reviewer-friendly.",
     "- Avoid code snippets or images.",
-    `- Add some fun with emojis from [${(limits.allowedEmojis || []).join(" ")}] only: at most one emoji per item, and at most ${limits.descMaxItems} total.`,
-    `- Use max ${limits.descMaxItems} items; each \u2264 ${limits.descMaxWordsPerItem} words; total \u2264 ${limits.descMaxTotalWords} words.`
+    rules.allowDescriptionEmojis ? `- Items MAY include at most 1 emoji per item (max 3 total across the description), from: [${descEmojiList}].` : "- Do NOT use any emoji in the description.",
+    `- Use max ${rules.descMaxItems} items; each \u2264 ${rules.descMaxWordsPerItem} words; total \u2264 ${rules.descMaxTotalWords} words.`
   ];
   if (creator) lines.push(`- Thank **${creator}** for the contribution! \u{1F389}`);
+  if (legendLines.length > 0) {
+    lines.push("", "Emoji legend (use to choose the most fitting one):");
+    lines.push(...legendLines);
+  }
   lines.push("", "Context:");
   if (currentTitle) lines.push(`Current title: ${currentTitle}`);
   lines.push(`Diff:
@@ -25178,7 +25264,7 @@ var GeminiAIHelper = class _GeminiAIHelper {
     try {
       const { model: modelName, temperature, maxOutputTokens, systemText } = this.config;
       const supportsSystem = _GeminiAIHelper.supportsSystemInstruction(modelName);
-      const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, limits: params?.limits });
+      const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, rules: params?.rules });
       const promptPreview = previewText(unifiedPrompt, PROMPT_PREVIEW_LIMIT);
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Request`);
@@ -25257,7 +25343,7 @@ ${text}`);
         const retryOutcome3 = await generateWithRetry(
           async (activeModelName) => {
             const model = this.cache.getOrBuild(activeModelName);
-            const contPayload = this.buildTailContinuationRequest(partialDescUnescaped, temperature, tailMax, params?.limits);
+            const contPayload = this.buildTailContinuationRequest(partialDescUnescaped, temperature, tailMax, params?.rules);
             return model.generateContent(contPayload);
           },
           { logger: this.logger, provider: "Gemini", initialModel: retryOutcome.modelUsed, retry: this.config.retry }
@@ -25361,7 +25447,7 @@ ${contText}`);
     out = out.replace(/\\t/g, "	");
     return out;
   }
-  buildTailContinuationRequest(prefix, temperature, maxOutputTokens, limits) {
+  buildTailContinuationRequest(prefix, temperature, maxOutputTokens, rules) {
     const excerpt = prefix.length > DESC_EXCERPT_CHARS ? prefix.slice(-DESC_EXCERPT_CHARS) : prefix;
     const tailSchema = {
       type: SchemaType.OBJECT,
@@ -25381,7 +25467,7 @@ ${contText}`);
       "- Keep the same style and structure (continue the Markdown list if it was started).",
       '- Do not re-emit the "title".',
       "- No code fences, no commentary.",
-      `- Stay within the original limits: max ${limits?.descMaxItems ?? 5} items, each \u2264 ${limits?.descMaxWordsPerItem ?? 25} words, total \u2264 ${limits?.descMaxTotalWords ?? 300} words.`
+      `- Stay within the original limits: max ${rules?.descMaxItems ?? 5} items, each \u2264 ${rules?.descMaxWordsPerItem ?? 25} words, total \u2264 ${rules?.descMaxTotalWords ?? 300} words.`
     ].join("\n");
     const contextMsg = "Here is the last " + String(DESC_EXCERPT_CHARS) + " characters of the description you already produced:\n" + excerpt;
     return {
@@ -25473,7 +25559,7 @@ var OpenAIHelper = class {
   }
   async generatePullRequestContent(diffOutput, params) {
     const { model, temperature, systemText } = this.config;
-    const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, limits: params?.limits });
+    const unifiedPrompt = buildUnifiedPRPrompt({ diff: diffOutput, currentTitle: params?.currentTitle, creator: params?.creator, rules: params?.rules });
     const promptPreview = previewText(unifiedPrompt, PROMPT_PREVIEW_LIMIT);
     try {
       this.logger.info(`[AI][OpenAI] ::group::Request`);
@@ -25713,8 +25799,8 @@ var PullRequestUpdater = class {
     const githubToken = (0, import_core.getInput)("github_token", { required: true }).trim();
     this.octokit = (0, import_github.getOctokit)(githubToken);
     this.updateTitle = ((0, import_core.getInput)("update_title") || "").toLowerCase() === "true";
-    this.limits = this.readPromptLimitsFromInputs();
-    core3.info(`[PR] limits ${JSON.stringify(this.limits)}`);
+    this.rules = this.readRulesFromInputs();
+    core3.info(`[PR] rules ${JSON.stringify(this.rules)}`);
   }
   clamp(n, min, max) {
     return Math.max(min, Math.min(max, n));
@@ -25723,115 +25809,65 @@ var PullRequestUpdater = class {
     const s = (raw || "").trim();
     const v = Number.parseInt(s, 10);
     if (!Number.isFinite(v)) {
-      core3.warning(`[PR][limits] ${nameForLog} invalid ('${raw ?? ""}'); using default ${fallback}`);
+      core3.warning(`[PR][rules] ${nameForLog} invalid ('${raw ?? ""}'); using default ${fallback}`);
       return fallback;
     }
     const clamped = this.clamp(v, min, max);
     if (clamped !== v) {
-      core3.warning(`[PR][limits] ${nameForLog} out of range (${v}); clamped to ${clamped}`);
+      core3.warning(`[PR][rules] ${nameForLog} out of range (${v}); clamped to ${clamped}`);
     }
     return clamped;
   }
-  readPromptLimitsFromInputs() {
+  readRulesFromInputs() {
     const DEFAULTS = {
       titleMaxLen: 120,
       descMaxItems: 5,
       descMaxWordsPerItem: 25,
       descMaxTotalWords: 300,
-      allowedEmojis: [
-        "\u{1F680}",
-        "\u2728",
-        "\u{1F389}",
-        "\u2705",
-        "\u{1F44D}",
-        "\u{1F44F}",
-        "\u{1F525}",
-        "\u26A1\uFE0F",
-        "\u{1F41B}",
-        "\u{1FA79}",
-        "\u{1F691}\uFE0F",
-        "\u267B\uFE0F",
-        "\u{1F9F9}",
-        "\u{1F9FC}",
-        "\u{1F9FD}",
-        "\u{1F9F0}",
-        "\u{1F527}",
-        "\u{1F528}",
-        "\u2699\uFE0F",
-        "\u{1F9F1}",
-        "\u{1F3D7}\uFE0F",
-        "\u{1F6A7}",
-        "\u{1F916}",
-        "\u{1F477}",
-        "\u{1F4E6}",
-        "\u{1F4CC}",
-        "\u{1F517}",
-        "\u2B06\uFE0F",
-        "\u2B07\uFE0F",
-        "\u{1F4C8}",
-        "\u{1F4CA}",
-        "\u{1F50D}\uFE0F",
-        "\u{1F50E}",
-        "\u{1F50A}",
-        "\u{1F507}",
-        "\u{1F4DD}",
-        "\u{1F4DA}",
-        "\u{1F4C4}",
-        "\u{1F9FE}",
-        "\u270F\uFE0F",
-        "\u{1F3A8}",
-        "\u{1F484}",
-        "\u{1F58C}\uFE0F",
-        "\u{1F5BC}\uFE0F",
-        "\u267F\uFE0F",
-        "\u{1F310}",
-        "\u{1F512}",
-        "\u{1F510}",
-        "\u{1F6E1}\uFE0F",
-        "\u{1F511}",
-        "\u{1F4A5}",
-        "\u23EA\uFE0F",
-        "\u{1F500}",
-        "\u{1F69A}",
-        "\u{1F433}",
-        "\u{1F4AC}",
-        "\u{1F6A9}",
-        "\u{1F3F7}\uFE0F",
-        "\u{1F516}",
-        "\u{1F49A}",
-        "\u{1F4F1}",
-        "\u{1F5A5}\uFE0F",
-        "\u{1F50C}",
-        "\u{1F4A1}",
-        "\u{1F9EA}",
-        "\u{1F52C}",
-        "\u{1F5D1}\uFE0F",
-        "\u{1F4BE}",
-        "\u{1F5C2}\uFE0F",
-        "\u{1F5C3}\uFE0F",
-        "\u{1F4E1}",
-        "\u{1F440}"
-      ]
+      // Emoji rules defaults
+      allowTitleEmojis: true,
+      allowDescriptionEmojis: true,
+      titleEmojis: ["\u2728", "\u{1F41B}", "\u267B\uFE0F", "\u26A1\uFE0F", "\u{1F525}", "\u{1F680}", "\u{1F4DD}", "\u{1F527}", "\u{1F3D7}\uFE0F", "\u{1F512}\uFE0F", "\u2705", "\u{1F389}"],
+      descriptionEmojis: ["\u2728", "\u{1F41B}", "\u267B\uFE0F", "\u26A1\uFE0F", "\u{1F525}", "\u{1F680}", "\u{1F4DD}", "\u{1F527}", "\u{1F3D7}\uFE0F", "\u{1F512}\uFE0F", "\u2705", "\u{1F389}", "\u2B06\uFE0F", "\u2B07\uFE0F", "\u{1F4E6}\uFE0F", "\u{1F4C8}", "\u{1F9EA}", "\u{1F5D1}\uFE0F", "\u{1F477}", "\u{1F6A7}", "\u{1F4CC}", "\u2795", "\u2796", "\u{1F528}", "\u{1F310}", "\u270F\uFE0F", "\u23EA\uFE0F", "\u{1F500}", "\u{1F47D}\uFE0F", "\u{1F69A}", "\u{1F4C4}", "\u{1F4A5}", "\u{1F371}", "\u267F\uFE0F", "\u{1F4A1}", "\u{1F4AC}", "\u{1F5C3}\uFE0F", "\u{1F50A}", "\u{1F507}", "\u{1F465}", "\u{1F6B8}", "\u{1F4F1}", "\u{1F921}", "\u{1F648}", "\u{1F4F8}", "\u2697\uFE0F", "\u{1F50D}\uFE0F", "\u{1F3F7}\uFE0F", "\u{1F331}", "\u{1F6A9}", "\u{1F945}", "\u{1F4AB}", "\u{1F6C2}", "\u{1FA79}", "\u{1F9D0}", "\u26B0\uFE0F", "\u{1F9F1}", "\u{1F9D1}\u200D\u{1F4BB}", "\u{1F4B8}", "\u{1F9F5}", "\u{1F9BA}", "\u2708\uFE0F"]
     };
     const titleRaw = (0, import_core.getInput)("title_max_len");
     const itemsRaw = (0, import_core.getInput)("desc_max_items");
     const wordsPerItemRaw = (0, import_core.getInput)("desc_max_words_per_item");
     const totalWordsRaw = (0, import_core.getInput)("desc_max_total_words");
-    const emojisRaw = (0, import_core.getInput)("allowed_emojis");
+    const allowTitleEmojisRaw = (0, import_core.getInput)("allow_title_emojis");
+    const allowDescEmojisRaw = (0, import_core.getInput)("allow_description_emojis");
+    const titleEmojisRaw = (0, import_core.getInput)("allowed_emojis_titles");
+    const descEmojisRaw = (0, import_core.getInput)("allowed_emojis_descriptions");
     const titleMaxLen = this.parseIntOrDefault(titleRaw, DEFAULTS.titleMaxLen, "title_max_len", 1, 300);
     const descMaxItems = this.parseIntOrDefault(itemsRaw, DEFAULTS.descMaxItems, "desc_max_items", 1, 50);
     const descMaxWordsPerItem = this.parseIntOrDefault(wordsPerItemRaw, DEFAULTS.descMaxWordsPerItem, "desc_max_words_per_item", 1, 100);
     const descMaxTotalWords = this.parseIntOrDefault(totalWordsRaw, DEFAULTS.descMaxTotalWords, "desc_max_total_words", 1, 2e3);
-    const allowedEmojis = (emojisRaw || DEFAULTS.allowedEmojis.join(",")).split(",").map((s) => s.trim()).filter(Boolean);
-    if (allowedEmojis.length === 0) {
-      core3.warning("[PR][limits] allowed_emojis is empty; using defaults");
+    const parseBool = (raw, fallback) => {
+      const s = (raw || "").trim().toLowerCase();
+      if (["true", "1", "yes", "y"].includes(s)) return true;
+      if (["false", "0", "no", "n"].includes(s)) return false;
+      if (s) core3.warning(`[PR][rules] boolean value invalid ('${raw}'); using default ${fallback}`);
+      return fallback;
+    };
+    const allowTitleEmojis = parseBool(allowTitleEmojisRaw, DEFAULTS.allowTitleEmojis);
+    const allowDescriptionEmojis = parseBool(allowDescEmojisRaw, DEFAULTS.allowDescriptionEmojis);
+    const titleEmojis = (titleEmojisRaw || DEFAULTS.titleEmojis.join(",")).split(",").map((s) => s.trim()).filter(Boolean);
+    if (titleEmojis.length === 0) {
+      core3.warning("[PR][rules] allowed_emojis_titles is empty; using defaults");
+    }
+    const descriptionEmojis = (descEmojisRaw || DEFAULTS.descriptionEmojis.join(",")).split(",").map((s) => s.trim()).filter(Boolean);
+    if (descriptionEmojis.length === 0) {
+      core3.warning("[PR][rules] allowed_emojis_descriptions is empty; using defaults");
     }
     return {
       titleMaxLen,
       descMaxItems,
       descMaxWordsPerItem,
       descMaxTotalWords,
-      allowedEmojis: allowedEmojis.length > 0 ? allowedEmojis : [...DEFAULTS.allowedEmojis]
+      allowTitleEmojis,
+      allowDescriptionEmojis,
+      titleEmojis: titleEmojis.length > 0 ? titleEmojis : [...DEFAULTS.titleEmojis],
+      descriptionEmojis: descriptionEmojis.length > 0 ? descriptionEmojis : [...DEFAULTS.descriptionEmojis]
     };
   }
   parseConventionalCommit(title) {
@@ -26033,6 +26069,7 @@ var PullRequestUpdater = class {
     let type = parsed.type;
     let scope = parsed.scope;
     let bareSubject = parsed.type ? parsed.subject : subject;
+    bareSubject = this.stripLeadingConventionalPrefix(bareSubject);
     core3.debug(`[Title] format -> initial ${JSON.stringify({ subject, parsed, currentTitle })}`);
     const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
     const recommendedScope = this.chooseScopeFromFilesWithMonorepo(files);
@@ -26051,12 +26088,71 @@ var PullRequestUpdater = class {
     bareSubject = bareSubject.replace(/\s*#\d+\s*$/g, "").trim();
     bareSubject = this.toImperativeWithLog(bareSubject);
     const prefix = `${type}${scope ? `(${scope})` : ""}: `;
-    const allowedSubjectLen = Math.max(0, this.limits.titleMaxLen - prefix.length);
+    const allowedSubjectLen = Math.max(0, this.rules.titleMaxLen - prefix.length);
     let finalSubject = bareSubject.length > allowedSubjectLen ? this.shortenSubject(bareSubject, allowedSubjectLen) : bareSubject;
     finalSubject = finalSubject.replace(/[\.!?]+$/g, "");
-    const finalTitle = `${prefix}${finalSubject}`;
+    let finalTitle;
+    if (this.rules.allowTitleEmojis) {
+      const allowed = this.rules.titleEmojis || [];
+      const found = this.findFirstAllowedEmoji(subject, allowed);
+      const chosen = found || this.pickEmojiForTypeFromAllowed(type, allowed) || allowed[0];
+      const cleanSubject = this.removeAllEmojis(finalSubject).trim();
+      finalTitle = chosen ? `${chosen} ${prefix}${cleanSubject}` : `${prefix}${cleanSubject}`;
+    } else {
+      finalTitle = `${prefix}${this.removeAllEmojis(finalSubject).trim()}`;
+    }
     core3.debug(`[Title] format -> final ${JSON.stringify({ type, scope, prefix, allowedSubjectLen, finalSubject, finalTitle })}`);
     return finalTitle;
+  }
+  stripLeadingConventionalPrefix(s) {
+    if (!s) return s;
+    const re = /^(?:\p{Extended_Pictographic}+\s*)?(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(?:\([^)]*\))?:\s*/iu;
+    return s.replace(re, "").trim();
+  }
+  removeAllEmojis(s) {
+    if (!s) return s;
+    return s.replace(/\p{Extended_Pictographic}/gu, "").replace(/[\uFE0E\uFE0F\u200D]/g, "");
+  }
+  findFirstAllowedEmoji(s, allowed) {
+    if (!s || !allowed?.length) return void 0;
+    let bestIdx = Number.POSITIVE_INFINITY;
+    let best;
+    for (const e of allowed) {
+      const idx = s.indexOf(e);
+      if (idx >= 0 && idx < bestIdx) {
+        bestIdx = idx;
+        best = e;
+      }
+    }
+    return best;
+  }
+  pickEmojiForTypeFromAllowed(type, allowed) {
+    if (!allowed?.length) return void 0;
+    const prefer = (...candidates) => candidates.find((c) => allowed.includes(c));
+    switch ((type || "").toLowerCase()) {
+      case "feat":
+        return prefer("\u2728", "\u{1F680}");
+      case "fix":
+        return prefer("\u{1F41B}", "\u{1FA79}");
+      case "docs":
+        return prefer("\u{1F4DD}");
+      case "refactor":
+        return prefer("\u267B\uFE0F");
+      case "perf":
+        return prefer("\u26A1\uFE0F");
+      case "style":
+        return prefer("\u{1F484}", "\u{1F3A8}");
+      case "test":
+        return prefer("\u2705", "\u{1F9EA}");
+      case "build":
+        return prefer("\u{1F3D7}\uFE0F", "\u{1F527}", "\u{1F4E6}\uFE0F");
+      case "ci":
+        return prefer("\u{1F477}", "\u{1F527}");
+      case "chore":
+        return prefer("\u{1F9F9}", "\u{1F527}");
+      default:
+        return allowed[0];
+    }
   }
   /**
    * Attempts to shorten a subject line more intelligently than a hard slice.
@@ -26098,7 +26194,7 @@ var PullRequestUpdater = class {
       core3.startGroup("AI Generation");
       core3.info("[PR] calling AI to generate title and description");
       const currentTitle = prCtx.title || "";
-      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, limits: this.limits });
+      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, rules: this.rules });
       core3.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
       const preview = (content.description || "").slice(0, 400);
       core3.info(`[PR] AI description preview:
