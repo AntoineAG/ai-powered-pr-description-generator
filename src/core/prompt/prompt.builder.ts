@@ -74,9 +74,10 @@ export function buildUnifiedPRPrompt(params: UnifiedPRPromptParams): string {
     '- If a current title exists, improve it slightly if useful.',
     '',
     'Description rules:',
-    '- Markdown format. Begin with a subtitle: "## What this PR does?\n"',
+    '- Markdown format. Begin with a subtitle: "## What this PR does?".',
+    '- Follow with a line break.',
     '- Provide a simple description of the changes.',
-    '- Numbered list of key changes. Do not paste the raw diff.',
+    '- Numbered list of key changes. Do not paste the raw diff. Line break between items.',
     '- Keep it simple and reviewer-friendly.',
     '- Avoid code snippets or images.',
     rules.allowDescriptionEmojis
