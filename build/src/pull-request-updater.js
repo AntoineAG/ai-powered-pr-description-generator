@@ -75,7 +75,7 @@ class PullRequestUpdater {
       1. Added a new feature👏 
       2. Fixed a bug👍 
       3. Major refactor🚀.
-    - Thank **${creator}** for the contribution! 🎉
+    - Thanks **${creator}** for the contribution! 🎉
   
     Diff:
     ${diffOutput}`;
