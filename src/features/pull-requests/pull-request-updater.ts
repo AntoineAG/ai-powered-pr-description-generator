@@ -119,24 +119,6 @@ class PullRequestUpdater {
       descriptionEmojis: descriptionEmojis.length > 0 ? descriptionEmojis : [...DEFAULTS.descriptionEmojis],
     };
   }
-
-
-  private parseConventionalCommit(title: string): { type?: string; scope?: string; subject: string } {
-    const re = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(?:\(([^)]+)\))?:\s*(.+)$/i;
-    const m = title.match(re);
-    if (m) {
-      return { type: m[1].toLowerCase(), scope: m[2], subject: (m[3] || '').trim() };
-    }
-    return { subject: title.trim() };
-  }
-
-  private parseConventionalCommitWithLog(title: string): { type?: string; scope?: string; subject: string } {
-    const parsed = this.parseConventionalCommit(title);
-    core.info(`[Title] parse ${JSON.stringify({ input: title, parsed })}`);
-    return parsed;
-  }
-
-
   /**
    * Picks a scope from the changed files, preferring a monorepo scope if changes span many areas.   */
   private chooseScopeFromFilesWithMonorepo(files: string[]): string | undefined {
@@ -286,26 +268,20 @@ class PullRequestUpdater {
    * enforcing imperative form and ≤72 characters total length.
    */
   private formatConventionalCommitTitle(subject: string, diffOutput: string, files: string[], currentTitle: string, aiType?: string, aiScope?: string): string {
-    const parsed = this.parseConventionalCommitWithLog(subject);
-    // Prefer type/scope parsed from a conventional string; otherwise, use AI-provided structured fields
+    // Allowed types for validation
     const allowedTypes = new Set(['feat','fix','docs','style','refactor','perf','test','build','ci','chore']);
 
-    const parsedType = parsed.type && allowedTypes.has(parsed.type) ? parsed.type : undefined;
+    // Start with AI-provided meta fields
     const metaType = (aiType || '').trim().toLowerCase() || undefined;
-    const metaTypeValid = metaType && allowedTypes.has(metaType) ? metaType : undefined;
-    let type = parsedType ?? metaTypeValid;
-
-    let scope: string | undefined = (parsed.scope || '').trim() || undefined;
-    if (!scope) scope = (aiScope || '').trim() || undefined;
+    let type = metaType && allowedTypes.has(metaType) ? metaType : undefined;
+    let scope: string | undefined = (aiScope || '').trim() || undefined;
 
     const originalType = type;
     const originalScope = scope || undefined;
-    let bareSubject = parsed.type ? parsed.subject : subject;
+    // Remove any leading conventional prefix or emojis from the subject text for clean formatting
+    let bareSubject = this.stripLeadingConventionalPrefix(subject);
 
-    // If the AI included a leading emoji and/or conventional prefix inside the subject, remove it
-    bareSubject = this.stripLeadingConventionalPrefix(bareSubject);
-
-    core.debug(`[Title] format -> initial ${JSON.stringify({ subject, parsed, currentTitle })}`);
+    core.debug(`[Title] format -> initial ${JSON.stringify({ subject, currentTitle })}`);
 
     // Determine a recommended type/scope from local heuristics
     const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
@@ -313,7 +289,7 @@ class PullRequestUpdater {
     core.info(`[Title] recommendations type=${recommendedType} scope=${recommendedScope ?? '(none)'} (from diff/files)`);
 
     // Merge decision logging (before applying fallbacks)
-    core.info(`[Title] merge inputs: ai.type=${aiType ?? '(none)'} ai.scope=${aiScope ?? '(none)'} parsed.type=${parsed.type ?? '(none)'} parsed.scope=${parsed.scope ?? '(none)'} -> initial.type=${type ?? '(none)'} initial.scope=${(scope || undefined) ?? '(none)'} `);
+    core.info(`[Title] merge inputs: ai.type=${aiType ?? '(none)'} ai.scope=${aiScope ?? '(none)'} -> initial.type=${type ?? '(none)'} initial.scope=${(scope || undefined) ?? '(none)'} `);
 
     // If AI didn't supply a valid type, use recommendation. Do not override valid AI types.
     let typeDecisionReason: string | undefined;

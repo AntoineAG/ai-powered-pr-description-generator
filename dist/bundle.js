@@ -25875,19 +25875,6 @@ var PullRequestUpdater = class {
       descriptionEmojis: descriptionEmojis.length > 0 ? descriptionEmojis : [...DEFAULTS.descriptionEmojis]
     };
   }
-  parseConventionalCommit(title) {
-    const re = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore)(?:\(([^)]+)\))?:\s*(.+)$/i;
-    const m = title.match(re);
-    if (m) {
-      return { type: m[1].toLowerCase(), scope: m[2], subject: (m[3] || "").trim() };
-    }
-    return { subject: title.trim() };
-  }
-  parseConventionalCommitWithLog(title) {
-    const parsed = this.parseConventionalCommit(title);
-    core3.info(`[Title] parse ${JSON.stringify({ input: title, parsed })}`);
-    return parsed;
-  }
   /**
    * Picks a scope from the changed files, preferring a monorepo scope if changes span many areas.   */
   chooseScopeFromFilesWithMonorepo(files) {
@@ -26078,23 +26065,18 @@ var PullRequestUpdater = class {
    * enforcing imperative form and ≤72 characters total length.
    */
   formatConventionalCommitTitle(subject, diffOutput, files, currentTitle, aiType, aiScope) {
-    const parsed = this.parseConventionalCommitWithLog(subject);
     const allowedTypes = /* @__PURE__ */ new Set(["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore"]);
-    const parsedType = parsed.type && allowedTypes.has(parsed.type) ? parsed.type : void 0;
     const metaType = (aiType || "").trim().toLowerCase() || void 0;
-    const metaTypeValid = metaType && allowedTypes.has(metaType) ? metaType : void 0;
-    let type = parsedType ?? metaTypeValid;
-    let scope = (parsed.scope || "").trim() || void 0;
-    if (!scope) scope = (aiScope || "").trim() || void 0;
+    let type = metaType && allowedTypes.has(metaType) ? metaType : void 0;
+    let scope = (aiScope || "").trim() || void 0;
     const originalType = type;
     const originalScope = scope || void 0;
-    let bareSubject = parsed.type ? parsed.subject : subject;
-    bareSubject = this.stripLeadingConventionalPrefix(bareSubject);
-    core3.debug(`[Title] format -> initial ${JSON.stringify({ subject, parsed, currentTitle })}`);
+    let bareSubject = this.stripLeadingConventionalPrefix(subject);
+    core3.debug(`[Title] format -> initial ${JSON.stringify({ subject, currentTitle })}`);
     const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
     const recommendedScope = this.chooseScopeFromFilesWithMonorepo(files);
     core3.info(`[Title] recommendations type=${recommendedType} scope=${recommendedScope ?? "(none)"} (from diff/files)`);
-    core3.info(`[Title] merge inputs: ai.type=${aiType ?? "(none)"} ai.scope=${aiScope ?? "(none)"} parsed.type=${parsed.type ?? "(none)"} parsed.scope=${parsed.scope ?? "(none)"} -> initial.type=${type ?? "(none)"} initial.scope=${(scope || void 0) ?? "(none)"} `);
+    core3.info(`[Title] merge inputs: ai.type=${aiType ?? "(none)"} ai.scope=${aiScope ?? "(none)"} -> initial.type=${type ?? "(none)"} initial.scope=${(scope || void 0) ?? "(none)"} `);
     let typeDecisionReason;
     if (!type || !allowedTypes.has(type)) {
       type = recommendedType;
