@@ -25290,8 +25290,12 @@ ${promptPreview}`);
       this.logger.info(`[AI][Gemini]`);
       this.logger.startGroup(`Response`);
       this.logger.info(`[AI][Gemini] finishReason=${finishReason}`);
-      this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} rawLength=${text.length}`);
-      this.logger.info(`[AI][Gemini] raw:
+      this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)}
+`);
+      this.logger.info(`[AI][Gemini] raw response:
+${JSON.stringify(response)}`);
+      this.logger.info(`[AI][Gemini] rawTextLength=${text.length}`);
+      this.logger.info(`[AI][Gemini] raw text:
 ${text}`);
       this.logger.endGroup();
       const diag = buildUsageDiagnostics(usage, text);
