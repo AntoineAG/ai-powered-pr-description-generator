@@ -69,9 +69,10 @@ function buildUnifiedPRPrompt(params) {
         '- If a current title exists, improve it slightly if useful.',
         '',
         'Description rules:',
-        '- Markdown format. Begin with a subtitle: "## What this PR does?\n"',
+        '- Markdown format. Begin with a subtitle: "## What this PR does?".',
+        '- Follow with a line break.',
         '- Provide a simple description of the changes.',
-        '- Numbered list of key changes. Do not paste the raw diff.',
+        '- Numbered list of key changes. Do not paste the raw diff. Line break between items.',
         '- Keep it simple and reviewer-friendly.',
         '- Avoid code snippets or images.',
         rules.allowDescriptionEmojis
@@ -79,12 +80,12 @@ function buildUnifiedPRPrompt(params) {
             : '- Do NOT use any emoji in the description.',
         `- Use max ${rules.descMaxItems} items; each ≤ ${rules.descMaxWordsPerItem} words; total ≤ ${rules.descMaxTotalWords} words.`,
     ];
+    if (creator)
+        lines.push(`- Thank **${creator}** for the contribution! 🎉`);
     if (legendLines.length > 0) {
         lines.push('', 'Emoji legend (use to choose the most fitting one):');
         lines.push(...legendLines);
     }
-    if (creator)
-        lines.push(`- Thank **${creator}** for the contribution! 🎉`);
     lines.push('', 'Context:');
     if (currentTitle)
         lines.push(`Current title: ${currentTitle}`);
