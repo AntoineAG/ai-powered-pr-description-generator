@@ -148,7 +148,7 @@ class PullRequestUpdater {
     }
     parseConventionalCommitWithLog(title) {
         const parsed = this.parseConventionalCommit(title);
-        core.debug(`[Title] parse ${JSON.stringify({ input: title, parsed })}`);
+        core.info(`[Title] parse ${JSON.stringify({ input: title, parsed })}`);
         return parsed;
     }
     /**
@@ -326,12 +326,19 @@ class PullRequestUpdater {
      * Formats a Conventional Commit title using AI suggestions (subject) and local heuristics (type/scope),
      * enforcing imperative form and ≤72 characters total length.
      */
-    formatConventionalCommitTitle(subject, diffOutput, files, currentTitle) {
+    formatConventionalCommitTitle(subject, diffOutput, files, currentTitle, aiType, aiScope) {
         const parsed = this.parseConventionalCommitWithLog(subject);
-        let type = parsed.type;
-        let scope = parsed.scope;
-        const originalType = parsed.type;
-        const originalScope = parsed.scope;
+        // Prefer type/scope parsed from a conventional string; otherwise, use AI-provided structured fields
+        const allowedTypes = new Set(['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore']);
+        const parsedType = parsed.type && allowedTypes.has(parsed.type) ? parsed.type : undefined;
+        const metaType = (aiType || '').trim().toLowerCase() || undefined;
+        const metaTypeValid = metaType && allowedTypes.has(metaType) ? metaType : undefined;
+        let type = parsedType ?? metaTypeValid;
+        let scope = (parsed.scope || '').trim() || undefined;
+        if (!scope)
+            scope = (aiScope || '').trim() || undefined;
+        const originalType = type;
+        const originalScope = scope || undefined;
         let bareSubject = parsed.type ? parsed.subject : subject;
         // If the AI included a leading emoji and/or conventional prefix inside the subject, remove it
         bareSubject = this.stripLeadingConventionalPrefix(bareSubject);
@@ -340,38 +347,24 @@ class PullRequestUpdater {
         const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
         const recommendedScope = this.chooseScopeFromFilesWithMonorepo(files);
         core.info(`[Title] recommendations type=${recommendedType} scope=${recommendedScope ?? '(none)'} (from diff/files)`);
-        // If AI didn't supply a type, use recommendation; otherwise, correct weak choices
-        const allowedTypes = new Set(['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore']);
+        // Merge decision logging (before applying fallbacks)
+        core.info(`[Title] merge inputs: ai.type=${aiType ?? '(none)'} ai.scope=${aiScope ?? '(none)'} parsed.type=${parsed.type ?? '(none)'} parsed.scope=${parsed.scope ?? '(none)'} -> initial.type=${type ?? '(none)'} initial.scope=${(scope || undefined) ?? '(none)'} `);
+        // If AI didn't supply a valid type, use recommendation. Do not override valid AI types.
         let typeDecisionReason;
         if (!type || !allowedTypes.has(type)) {
-            typeDecisionReason = !type ? 'AI omitted type' : `AI proposed invalid type '${type}'`;
             type = recommendedType;
-        }
-        else {
-            // Nudge obvious misclassifications: fix->feat for broad changes, chore->feat when code changed
-            if (type === 'fix' && recommendedType === 'feat') {
-                typeDecisionReason = 'nudged fix->feat due to broader signals';
-                type = 'feat';
-            }
-            if (type === 'chore' && recommendedType === 'feat') {
-                typeDecisionReason = 'nudged chore->feat because code changes detected';
-                type = 'feat';
-            }
+            typeDecisionReason = !originalType ? 'filled missing type from recommendation' : `invalid type '${originalType}' replaced by recommendation`;
         }
         if (typeDecisionReason && type !== originalType) {
             core.info(`[Title] Type updated: ${originalType ?? '(none)'} -> ${type} (${typeDecisionReason})`);
         }
-        // Scope: if missing, fill; if many areas/monorepo detected, prefer 'monorepo'
+        // Scope: apply recommendation only when missing
         let scopeDecisionReason;
         if (!scope && recommendedScope) {
-            scopeDecisionReason = 'AI omitted scope; inferred from changed files';
             scope = recommendedScope || undefined;
+            scopeDecisionReason = 'filled missing scope from changed files';
         }
-        else if (recommendedScope === 'monorepo' && scope !== 'monorepo') {
-            scopeDecisionReason = 'many areas/monorepo signals detected';
-            scope = 'monorepo';
-        }
-        if (scopeDecisionReason && scope !== originalScope) {
+        if (scopeDecisionReason && (scope || undefined) !== originalScope) {
             core.info(`[Title] Scope updated: ${originalScope ?? '(none)'} -> ${scope} (${scopeDecisionReason})`);
         }
         // Strip trailing issue references within subject as a safeguard
@@ -501,13 +494,14 @@ class PullRequestUpdater {
             core.info('[PR] AI generation completed!');
             core.info(`[PR] AI title length: titleLength=${content.title.length}`);
             core.info(`[PR] AI PR title before formatting: ${content.title}`);
+            core.info(`[PR] AI meta: type=${content.meta?.type ?? '(none)'} scope=${content.meta?.scope ?? '(none)'} subject=${content.meta?.subject ?? '(none)'} `);
             core.info(`[PR] AI description length: descriptionLength=${content.description.length}`);
             core.info(`[PR] AI description:\n${content.description}\n\n`);
             core.endGroup();
             // Compute final Conventional Commit title from AI output and local inference
             let generatedTitle;
             const baseTitleForFormatting = (content.title || content.meta?.subject || '').trim();
-            const formatted = this.formatConventionalCommitTitle(baseTitleForFormatting, diffOutput, changedFiles, currentTitle);
+            const formatted = this.formatConventionalCommitTitle(baseTitleForFormatting, diffOutput, changedFiles, currentTitle, content.meta?.type, content.meta?.scope);
             core.info(`[PR] [Formatter/Title] formatted title length: formattedTitleLength=${formatted.length}\n`);
             core.info(`[PR] [Formatter/Title] generated title after formatting: ${formatted}`);
             if (this.updateTitle)
