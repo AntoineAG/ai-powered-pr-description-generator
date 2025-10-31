@@ -206,12 +206,15 @@ class PullRequestUpdater {
         const total = files.length;
         const manyAreas = Object.keys(candidates).length > 3 || (hasApps && hasPackages) || (hasBackend && hasFrontend);
         if (bestCount / total < 0.5 || manyAreas || hasMonorepoFiles) {
-            core.debug(`[Title] scope -> monorepo ${JSON.stringify({ total, best, bestCount, candidates, hasApps, hasPackages, hasBackend, hasFrontend, hasMonorepoFiles })}`);
+            const detail = { total, best, bestCount, candidates, hasApps, hasPackages, hasBackend, hasFrontend, hasMonorepoFiles };
+            core.debug(`[Title] scope -> monorepo ${JSON.stringify(detail)}`);
+            core.info(`[Title] scope recommendation: monorepo (spread across many areas or monorepo signals) details=${JSON.stringify(detail)}`);
             return 'monorepo';
         }
         if (best === 'root')
             return 'repo';
         core.debug(`[Title] scope -> best ${JSON.stringify({ scope: best, total, bestCount, candidates })}`);
+        core.info(`[Title] scope recommendation: ${best} (majority of changes)`);
         return best;
     }
     /**
@@ -271,7 +274,8 @@ class PullRequestUpdater {
         const isCodeFile = (f) => /(\.ts$|\.tsx$|\.js$|\.jsx$|\.py$|\.go$|\.rb$|\.rs$|\.java$|\.php$)/i.test(f);
         const some = (pred) => files.some(pred);
         const scores = { feat: 0, fix: 0, docs: 0, style: 0, refactor: 0, perf: 0, test: 0, build: 0, ci: 0, chore: 0 };
-        const add = (k, n, reason) => { scores[k] += n; core.debug(`[Title] score +${n} => ${k} :: ${reason}`); };
+        const reasons = [];
+        const add = (k, n, reason) => { scores[k] += n; const msg = `+${n} => ${k} :: ${reason}`; reasons.push(msg); core.debug(`[Title] score ${msg}`); };
         if (some(isCodeFile))
             add('feat', 2, 'code changes present');
         if (some(isDocsFile))
@@ -309,11 +313,13 @@ class PullRequestUpdater {
         }
         if (bestType === 'fix' && (monorepoSignals || addedFileSignals >= 3 || scores['feat'] >= scores['fix'] - 1)) {
             core.debug('[Title] adjust type: fix -> feat due to broader signals');
+            reasons.push('adjust: fix -> feat (broader signals)');
             bestType = 'feat';
         }
         if (bestType === 'chore' && some(isCodeFile))
             bestType = 'feat';
         core.debug(`[Title] infer (scored) -> result ${JSON.stringify({ bestType, scores })}`);
+        core.info(`[Title] type recommendation: ${bestType} | reasons=${reasons.join(' | ')} | scores=${JSON.stringify(scores)}`);
         return bestType;
     }
     /**
@@ -324,6 +330,8 @@ class PullRequestUpdater {
         const parsed = this.parseConventionalCommitWithLog(subject);
         let type = parsed.type;
         let scope = parsed.scope;
+        const originalType = parsed.type;
+        const originalScope = parsed.scope;
         let bareSubject = parsed.type ? parsed.subject : subject;
         // If the AI included a leading emoji and/or conventional prefix inside the subject, remove it
         bareSubject = this.stripLeadingConventionalPrefix(bareSubject);
@@ -331,24 +339,40 @@ class PullRequestUpdater {
         // Determine a recommended type/scope from local heuristics
         const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
         const recommendedScope = this.chooseScopeFromFilesWithMonorepo(files);
+        core.info(`[Title] recommendations type=${recommendedType} scope=${recommendedScope ?? '(none)'} (from diff/files)`);
         // If AI didn't supply a type, use recommendation; otherwise, correct weak choices
         const allowedTypes = new Set(['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore']);
+        let typeDecisionReason;
         if (!type || !allowedTypes.has(type)) {
+            typeDecisionReason = !type ? 'AI omitted type' : `AI proposed invalid type '${type}'`;
             type = recommendedType;
         }
         else {
             // Nudge obvious misclassifications: fix->feat for broad changes, chore->feat when code changed
-            if (type === 'fix' && recommendedType === 'feat')
+            if (type === 'fix' && recommendedType === 'feat') {
+                typeDecisionReason = 'nudged fix->feat due to broader signals';
                 type = 'feat';
-            if (type === 'chore' && recommendedType === 'feat')
+            }
+            if (type === 'chore' && recommendedType === 'feat') {
+                typeDecisionReason = 'nudged chore->feat because code changes detected';
                 type = 'feat';
+            }
+        }
+        if (typeDecisionReason && type !== originalType) {
+            core.info(`[Title] Type updated: ${originalType ?? '(none)'} -> ${type} (${typeDecisionReason})`);
         }
         // Scope: if missing, fill; if many areas/monorepo detected, prefer 'monorepo'
-        if (!scope) {
+        let scopeDecisionReason;
+        if (!scope && recommendedScope) {
+            scopeDecisionReason = 'AI omitted scope; inferred from changed files';
             scope = recommendedScope || undefined;
         }
-        else if (recommendedScope === 'monorepo') {
+        else if (recommendedScope === 'monorepo' && scope !== 'monorepo') {
+            scopeDecisionReason = 'many areas/monorepo signals detected';
             scope = 'monorepo';
+        }
+        if (scopeDecisionReason && scope !== originalScope) {
+            core.info(`[Title] Scope updated: ${originalScope ?? '(none)'} -> ${scope} (${scopeDecisionReason})`);
         }
         // Strip trailing issue references within subject as a safeguard
         bareSubject = bareSubject.replace(/\s*#\d+\s*$/g, '').trim();
@@ -470,19 +494,22 @@ class PullRequestUpdater {
             core.debug(`[Title] changed files ${JSON.stringify({ count: changedFiles.length, files: changedFiles })}`);
             core.endGroup();
             core.startGroup('AI Generation');
-            core.info('[PR] calling AI to generate title and description');
+            core.info('[PR] calling AI to generate title and description...');
             const currentTitle = prCtx.title || '';
             //const diffForPrompt = diffOutput.length > 50000 ? this.buildDiffSummary(changedFiles, diffOutput) : diffOutput;
             const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, rules: this.rules });
-            core.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
-            const preview = (content.description || '').slice(0, 400);
-            core.info(`[PR] AI description preview:\n${preview}${content.description.length > 400 ? '...' : ''}`);
+            core.info('[PR] AI generation completed!');
+            core.info(`[PR] AI title length: titleLength=${content.title.length}`);
+            core.info(`[PR] AI PR title before formatting: ${content.title}`);
+            core.info(`[PR] AI description length: descriptionLength=${content.description.length}`);
+            core.info(`[PR] AI description:\n${content.description}\n\n`);
             core.endGroup();
             // Compute final Conventional Commit title from AI output and local inference
             let generatedTitle;
             const baseTitleForFormatting = (content.title || content.meta?.subject || '').trim();
             const formatted = this.formatConventionalCommitTitle(baseTitleForFormatting, diffOutput, changedFiles, currentTitle);
-            core.info(`[Title] generated title (formatted) ${formatted}`);
+            core.info(`[PR] [Formatter/Title] formatted title length: formattedTitleLength=${formatted.length}\n`);
+            core.info(`[PR] [Formatter/Title] generated title after formatting: ${formatted}`);
             if (this.updateTitle)
                 generatedTitle = formatted;
             // Update the pull request description

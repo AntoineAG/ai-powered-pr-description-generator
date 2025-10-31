@@ -25942,11 +25942,14 @@ var PullRequestUpdater = class {
     const total = files.length;
     const manyAreas = Object.keys(candidates).length > 3 || hasApps && hasPackages || hasBackend && hasFrontend;
     if (bestCount / total < 0.5 || manyAreas || hasMonorepoFiles) {
-      core3.debug(`[Title] scope -> monorepo ${JSON.stringify({ total, best, bestCount, candidates, hasApps, hasPackages, hasBackend, hasFrontend, hasMonorepoFiles })}`);
+      const detail = { total, best, bestCount, candidates, hasApps, hasPackages, hasBackend, hasFrontend, hasMonorepoFiles };
+      core3.debug(`[Title] scope -> monorepo ${JSON.stringify(detail)}`);
+      core3.info(`[Title] scope recommendation: monorepo (spread across many areas or monorepo signals) details=${JSON.stringify(detail)}`);
       return "monorepo";
     }
     if (best === "root") return "repo";
     core3.debug(`[Title] scope -> best ${JSON.stringify({ scope: best, total, bestCount, candidates })}`);
+    core3.info(`[Title] scope recommendation: ${best} (majority of changes)`);
     return best;
   }
   /**
@@ -26028,9 +26031,12 @@ var PullRequestUpdater = class {
     const isCodeFile = (f) => /(\.ts$|\.tsx$|\.js$|\.jsx$|\.py$|\.go$|\.rb$|\.rs$|\.java$|\.php$)/i.test(f);
     const some = (pred) => files.some(pred);
     const scores = { feat: 0, fix: 0, docs: 0, style: 0, refactor: 0, perf: 0, test: 0, build: 0, ci: 0, chore: 0 };
+    const reasons = [];
     const add = (k, n, reason) => {
       scores[k] += n;
-      core3.debug(`[Title] score +${n} => ${k} :: ${reason}`);
+      const msg = `+${n} => ${k} :: ${reason}`;
+      reasons.push(msg);
+      core3.debug(`[Title] score ${msg}`);
     };
     if (some(isCodeFile)) add("feat", 2, "code changes present");
     if (some(isDocsFile)) add("docs", 2, "docs files present");
@@ -26059,10 +26065,12 @@ var PullRequestUpdater = class {
     }
     if (bestType === "fix" && (monorepoSignals || addedFileSignals >= 3 || scores["feat"] >= scores["fix"] - 1)) {
       core3.debug("[Title] adjust type: fix -> feat due to broader signals");
+      reasons.push("adjust: fix -> feat (broader signals)");
       bestType = "feat";
     }
     if (bestType === "chore" && some(isCodeFile)) bestType = "feat";
     core3.debug(`[Title] infer (scored) -> result ${JSON.stringify({ bestType, scores })}`);
+    core3.info(`[Title] type recommendation: ${bestType} | reasons=${reasons.join(" | ")} | scores=${JSON.stringify(scores)}`);
     return bestType;
   }
   /**
@@ -26073,22 +26081,42 @@ var PullRequestUpdater = class {
     const parsed = this.parseConventionalCommitWithLog(subject);
     let type = parsed.type;
     let scope = parsed.scope;
+    const originalType = parsed.type;
+    const originalScope = parsed.scope;
     let bareSubject = parsed.type ? parsed.subject : subject;
     bareSubject = this.stripLeadingConventionalPrefix(bareSubject);
     core3.debug(`[Title] format -> initial ${JSON.stringify({ subject, parsed, currentTitle })}`);
     const recommendedType = this.inferCommitTypeScored(diffOutput, files, currentTitle, bareSubject);
     const recommendedScope = this.chooseScopeFromFilesWithMonorepo(files);
+    core3.info(`[Title] recommendations type=${recommendedType} scope=${recommendedScope ?? "(none)"} (from diff/files)`);
     const allowedTypes = /* @__PURE__ */ new Set(["feat", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "chore"]);
+    let typeDecisionReason;
     if (!type || !allowedTypes.has(type)) {
+      typeDecisionReason = !type ? "AI omitted type" : `AI proposed invalid type '${type}'`;
       type = recommendedType;
     } else {
-      if (type === "fix" && recommendedType === "feat") type = "feat";
-      if (type === "chore" && recommendedType === "feat") type = "feat";
+      if (type === "fix" && recommendedType === "feat") {
+        typeDecisionReason = "nudged fix->feat due to broader signals";
+        type = "feat";
+      }
+      if (type === "chore" && recommendedType === "feat") {
+        typeDecisionReason = "nudged chore->feat because code changes detected";
+        type = "feat";
+      }
     }
-    if (!scope) {
+    if (typeDecisionReason && type !== originalType) {
+      core3.info(`[Title] Type updated: ${originalType ?? "(none)"} -> ${type} (${typeDecisionReason})`);
+    }
+    let scopeDecisionReason;
+    if (!scope && recommendedScope) {
+      scopeDecisionReason = "AI omitted scope; inferred from changed files";
       scope = recommendedScope || void 0;
-    } else if (recommendedScope === "monorepo") {
+    } else if (recommendedScope === "monorepo" && scope !== "monorepo") {
+      scopeDecisionReason = "many areas/monorepo signals detected";
       scope = "monorepo";
+    }
+    if (scopeDecisionReason && scope !== originalScope) {
+      core3.info(`[Title] Scope updated: ${originalScope ?? "(none)"} -> ${scope} (${scopeDecisionReason})`);
     }
     bareSubject = bareSubject.replace(/\s*#\d+\s*$/g, "").trim();
     bareSubject = this.toImperativeWithLog(bareSubject);
@@ -26197,18 +26225,24 @@ var PullRequestUpdater = class {
       core3.debug(`[Title] changed files ${JSON.stringify({ count: changedFiles.length, files: changedFiles })}`);
       core3.endGroup();
       core3.startGroup("AI Generation");
-      core3.info("[PR] calling AI to generate title and description");
+      core3.info("[PR] calling AI to generate title and description...");
       const currentTitle = prCtx.title || "";
       const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, rules: this.rules });
-      core3.info(`[PR] AI content lengths: title=${content.title.length} description=${content.description.length}`);
-      const preview = (content.description || "").slice(0, 400);
-      core3.info(`[PR] AI description preview:
-${preview}${content.description.length > 400 ? "..." : ""}`);
+      core3.info("[PR] AI generation completed!");
+      core3.info(`[PR] AI title length: titleLength=${content.title.length}`);
+      core3.info(`[PR] AI PR title before formatting: ${content.title}`);
+      core3.info(`[PR] AI description length: descriptionLength=${content.description.length}`);
+      core3.info(`[PR] AI description:
+${content.description}
+
+`);
       core3.endGroup();
       let generatedTitle;
       const baseTitleForFormatting = (content.title || content.meta?.subject || "").trim();
       const formatted = this.formatConventionalCommitTitle(baseTitleForFormatting, diffOutput, changedFiles, currentTitle);
-      core3.info(`[Title] generated title (formatted) ${formatted}`);
+      core3.info(`[PR] [Formatter/Title] formatted title length: formattedTitleLength=${formatted.length}
+`);
+      core3.info(`[PR] [Formatter/Title] generated title after formatting: ${formatted}`);
       if (this.updateTitle) generatedTitle = formatted;
       core3.startGroup("PR Update");
       core3.info(`[PR-Description] updating pull request #${pullRequestNumber}`);

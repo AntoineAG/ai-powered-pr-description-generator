@@ -52,8 +52,10 @@ class GeminiAIHelper {
             this.logger.info(`[AI][Gemini]`);
             this.logger.startGroup(`Response`);
             this.logger.info(`[AI][Gemini] finishReason=${finishReason}`);
-            this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)} rawLength=${text.length}`);
-            this.logger.info(`[AI][Gemini] raw:\n${text}`);
+            this.logger.info(`[AI][Gemini] usage=${JSON.stringify(usage)}\n`);
+            this.logger.info(`[AI][Gemini] raw response:\n${JSON.stringify(response)}`);
+            this.logger.info(`[AI][Gemini] rawTextLength=${text.length}`);
+            this.logger.info(`[AI][Gemini] raw text:\n${text}`);
             this.logger.endGroup();
             const diag = (0, usage_diagnostics_1.buildUsageDiagnostics)(usage, text);
             this.logger.info(`[AI][Gemini]`);
