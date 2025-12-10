@@ -56,6 +56,7 @@ GITHUB_TOKEN should be required (https://github.com/settings/tokens), it needs p
 
 Optional environment variables:
 - `GEMINI_MAX_OUTPUT_TOKENS`: Overrides Gemini `maxOutputTokens` for responses. Useful for testing truncation/continuation. Example: set to `20` to force a short first response and trigger a continuation.
+- `MAX_OUTPUT_TOKENS`: Global override for `maxOutputTokens` for all providers (Gemini/OpenAI). If set, this takes precedence over provider-specific defaults.
 
 ### Action Inputs
 - `ai_name` (required): Which provider to use. Supported: `gemini`, `open-ai`.

@@ -105,13 +105,13 @@ class GeminiAIHelper implements AIHelperInterface {
         this.logger.warn('[AI][Gemini] High thoughts/output token ratio (>90%). Consider increasing maxOutputTokens or tightening the prompt.');
       }
 
-      // First, try to parse strict JSON result
-      let parsed: PullRequestContentResult | null = null;
-      try {
-        parsed = this.parseUnifiedContent(text);
-      } catch (_) {
-        parsed = null;
-      }
+	      // First, try to parse strict JSON result
+	      let parsed: PullRequestContentResult | null = null;
+	      try {
+	        parsed = this.parseUnifiedContent(text);
+	      } catch (_) {
+	        parsed = null;
+	      }
 
       // If we have an empty output from MAX_TOKENS, retry with a bump
       if (!parsed && finishReason === FinishReason.MAX_TOKENS && (!text || text.trim().length === 0)) {
@@ -134,48 +134,69 @@ class GeminiAIHelper implements AIHelperInterface {
         }
       }
 
-      // If still unparsed (likely truncated JSON), attempt a JSON-mode tail continuation
-      if (!parsed) {
-        const cleaned = this.stripCodeFences(text);
-        const titleObj = this.extractTitleObject(cleaned);
-        const partialDesc = this.extractDescriptionPrefix(cleaned);
-        if (!titleObj || !partialDesc) {
-          throw new AIError('Gemini unified content parse error: non-JSON output', { provider: 'Gemini' });
-        }
+	      // If still unparsed (likely truncated JSON), attempt a JSON-mode tail continuation.
+	      // If that also fails, fall back to a plain-text description instead of failing the action.
+	      if (!parsed) {
+	        const cleaned = this.stripCodeFences(text);
+	        const titleObj = this.extractTitleObject(cleaned);
+	        const partialDesc = this.extractDescriptionPrefix(cleaned);
 
-        const partialDescUnescaped = this.unescapeJsonStringFragment(partialDesc);
-        const tailMax = Math.min(Math.ceil(maxOutputTokens * 1.5), 4096);
-        this.logger.info('[AI][Gemini] continuation: truncated JSON detected; requesting JSON tail only...');
-        const retryOutcome3 = await generateWithRetry<GenerateContentResult>(
-          async (activeModelName) => {
-            const model = this.cache.getOrBuild(activeModelName);
-            const contPayload: GenerateContentRequest = this.buildTailContinuationRequest(partialDescUnescaped, temperature, tailMax, params?.rules);
-            return model.generateContent(contPayload);
-          },
-          { logger: this.logger, provider: 'Gemini', initialModel: retryOutcome.modelUsed, retry: this.config.retry }
-        );
-        const contResp: EnhancedGenerateContentResponse = retryOutcome3.value.response;
-        const contText: string = this.concatCandidatePartsText(contResp);
-        this.logger.info(`[AI][Gemini] Tail raw:\n${contText}`);
-        const tailObj = this.tryParseJson<TailResponse>(contText);
-        if (!this.isTailResponse(tailObj)) {
-          throw new AIError('Gemini unified content parse error: continuation did not return description_tail', { provider: 'Gemini' });
-        }
-        const finalDescription = this.appendTailWithOverlap(partialDescUnescaped, tailObj.description_tail);
-        parsed = {
-          title: (titleObj.conventional || titleObj.subject || '').toString().trim(),
-          description: finalDescription,
-          meta: {
-            type: titleObj.type || undefined,
-            scope: titleObj.scope || undefined,
-            subject: titleObj.subject || undefined,
-          },
-        };
-      }
+	        if (!titleObj || !partialDesc) {
+	          this.logger.warn('[AI][Gemini] unified content parse failed; non-JSON or incomplete output. Falling back to plain-text description.');
+	          parsed = this.buildFallbackContentFromText(cleaned || text);
+	        } else {
+	          const partialDescUnescaped = this.unescapeJsonStringFragment(partialDesc);
+	          const tailMax = Math.min(Math.ceil(maxOutputTokens * 1.5), 4096);
+	          this.logger.info('[AI][Gemini] continuation: truncated JSON detected; requesting JSON tail only...');
+	          const retryOutcome3 = await generateWithRetry<GenerateContentResult>(
+	            async (activeModelName) => {
+	              const model = this.cache.getOrBuild(activeModelName);
+	              const contPayload: GenerateContentRequest = this.buildTailContinuationRequest(partialDescUnescaped, temperature, tailMax, params?.rules);
+	              return model.generateContent(contPayload);
+	            },
+	            { logger: this.logger, provider: 'Gemini', initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+	          );
+	          const contResp: EnhancedGenerateContentResponse = retryOutcome3.value.response;
+	          const contText: string = this.concatCandidatePartsText(contResp);
+	          this.logger.info(`[AI][Gemini] Tail raw:\n${contText}`);
+	          const tailObj = this.tryParseJson<TailResponse>(contText);
 
-      // Parsed successfully at this point
-      this.logger.info(`[AI][Gemini] content: titleLength=${parsed.title.length} descLength=${parsed.description.length}`);
-      return parsed;
+	          if (!this.isTailResponse(tailObj)) {
+	            this.logger.warn('[AI][Gemini] continuation did not return description_tail; using partial description without tail.');
+	            const finalDescription = partialDescUnescaped.trim();
+	            parsed = {
+	              title: (titleObj.conventional || titleObj.subject || '').toString().trim(),
+	              description: finalDescription,
+	              meta: {
+	                type: titleObj.type || undefined,
+	                scope: titleObj.scope || undefined,
+	                subject: titleObj.subject || undefined,
+	              },
+	            };
+	          } else {
+	            const finalDescription = this.appendTailWithOverlap(partialDescUnescaped, tailObj.description_tail);
+	            parsed = {
+	              title: (titleObj.conventional || titleObj.subject || '').toString().trim(),
+	              description: finalDescription,
+	              meta: {
+	                type: titleObj.type || undefined,
+	                scope: titleObj.scope || undefined,
+	                subject: titleObj.subject || undefined,
+	              },
+	            };
+	          }
+	        }
+	      }
+
+	      if (!parsed) {
+	        // Last-resort safety guard; should not normally be reached.
+	        this.logger.warn('[AI][Gemini] no structured content parsed; falling back to plain-text description.');
+	        parsed = this.buildFallbackContentFromText(text);
+	      }
+
+	      // Parsed successfully (or safely degraded) at this point
+	      this.logger.info(`[AI][Gemini] content: titleLength=${parsed.title.length} descLength=${parsed.description.length}`);
+	      return parsed;
     } catch (error) {
       const status = typeof (error as { status?: unknown })?.status === 'number' ? (error as { status: number }).status : undefined;
       const msg = error instanceof Error ? error.message : String(error);
@@ -307,6 +328,17 @@ class GeminiAIHelper implements AIHelperInterface {
 
   private isTailResponse(obj: unknown): obj is TailResponse {
     return isRecord(obj) && isString(obj.description_tail);
+  }
+
+  private buildFallbackContentFromText(raw: string): PullRequestContentResult {
+    const cleaned = this.stripCodeFences(raw || '');
+    const trimmed = cleaned.trim();
+    const description = trimmed || '## What this PR does?\n\n- Update pull request description.';
+    return {
+      title: '',
+      description,
+      meta: {},
+    };
   }
 
   private parseUnifiedContent(text: string): PullRequestContentResult {
