@@ -113,26 +113,47 @@ class GeminiAIHelper implements AIHelperInterface {
 	        parsed = null;
 	      }
 
-      // If we have an empty output from MAX_TOKENS, retry with a bump
-      if (!parsed && finishReason === FinishReason.MAX_TOKENS && (!text || text.trim().length === 0)) {
-        const bumped = Math.ceil(maxOutputTokens * 1.5);
-        this.logger.info(`[AI][Gemini] MAX_TOKENS with empty output; retry maxOutputTokens=${bumped}`);
-        const retryOutcome2 = await generateWithRetry<GenerateContentResult>(
-          async (activeModelName) => {
-            const model = this.cache.getOrBuild(activeModelName);
-            const rp: GenerateContentRequest = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
-            return model.generateContent(rp);
-          },
-          { logger: this.logger, provider: 'Gemini', initialModel: retryOutcome.modelUsed, retry: this.config.retry }
-        );
-        const retryResp: EnhancedGenerateContentResponse = retryOutcome2.value.response;
-        text = this.concatCandidatePartsText(retryResp);
-        try {
-          parsed = this.parseUnifiedContent(text);
-        } catch (_) {
-          parsed = null;
-        }
-      }
+	      // If we have an empty output from MAX_TOKENS, retry with a bump
+	      if (!parsed && finishReason === FinishReason.MAX_TOKENS && (!text || text.trim().length === 0)) {
+	        const bumped = Math.ceil(maxOutputTokens * 1.5);
+	        this.logger.info(`[AI][Gemini] MAX_TOKENS with empty output; retry maxOutputTokens=${bumped}`);
+	        const retryOutcome2 = await generateWithRetry<GenerateContentResult>(
+	          async (activeModelName) => {
+	            const model = this.cache.getOrBuild(activeModelName);
+	            const rp: GenerateContentRequest = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
+	            return model.generateContent(rp);
+	          },
+	          { logger: this.logger, provider: 'Gemini', initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+	        );
+	        const retryResp: EnhancedGenerateContentResponse = retryOutcome2.value.response;
+	        text = this.concatCandidatePartsText(retryResp);
+	        try {
+	          parsed = this.parseUnifiedContent(text);
+	        } catch (_) {
+	          parsed = null;
+	        }
+	      }
+
+	      // If still unparsed and we see a very high thoughts/output ratio, retry once with a larger maxOutputTokens.
+	      if (!parsed && diag.thoughtsRatio > 0.9) {
+	        const bumped = Math.min(Math.ceil(maxOutputTokens * 1.5), 4096);
+	        this.logger.info(`[AI][Gemini] High thoughts/output ratio with unparsed output; retry maxOutputTokens=${bumped}`);
+	        const retryOutcomeHighTokens = await generateWithRetry<GenerateContentResult>(
+	          async (activeModelName) => {
+	            const model = this.cache.getOrBuild(activeModelName);
+	            const rp: GenerateContentRequest = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
+	            return model.generateContent(rp);
+	          },
+	          { logger: this.logger, provider: 'Gemini', initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+	        );
+	        const retryRespHighTokens: EnhancedGenerateContentResponse = retryOutcomeHighTokens.value.response;
+	        text = this.concatCandidatePartsText(retryRespHighTokens);
+	        try {
+	          parsed = this.parseUnifiedContent(text);
+	        } catch (_) {
+	          parsed = null;
+	        }
+	      }
 
 	      // If still unparsed (likely truncated JSON), attempt a JSON-mode tail continuation.
 	      // If that also fails, fall back to a plain-text description instead of failing the action.

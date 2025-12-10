@@ -25336,6 +25336,25 @@ ${text}`);
           parsed = null;
         }
       }
+      if (!parsed && diag.thoughtsRatio > 0.9) {
+        const bumped = Math.min(Math.ceil(maxOutputTokens * 1.5), 4096);
+        this.logger.info(`[AI][Gemini] High thoughts/output ratio with unparsed output; retry maxOutputTokens=${bumped}`);
+        const retryOutcomeHighTokens = await generateWithRetry(
+          async (activeModelName) => {
+            const model = this.cache.getOrBuild(activeModelName);
+            const rp = buildGenerateRequest({ userText, temperature, maxOutputTokens: bumped });
+            return model.generateContent(rp);
+          },
+          { logger: this.logger, provider: "Gemini", initialModel: retryOutcome.modelUsed, retry: this.config.retry }
+        );
+        const retryRespHighTokens = retryOutcomeHighTokens.value.response;
+        text = this.concatCandidatePartsText(retryRespHighTokens);
+        try {
+          parsed = this.parseUnifiedContent(text);
+        } catch (_) {
+          parsed = null;
+        }
+      }
       if (!parsed) {
         const cleaned = this.stripCodeFences(text);
         const titleObj = this.extractTitleObject(cleaned);
@@ -26230,7 +26249,11 @@ var PullRequestUpdater = class {
       core3.startGroup("AI Generation");
       core3.info("[PR] calling AI to generate title and description...");
       const currentTitle = prCtx.title || "";
-      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, rules: this.rules });
+      const diffForPrompt = diffOutput.length > 5e4 ? this.buildDiffSummary(changedFiles, diffOutput) : diffOutput;
+      if (diffForPrompt !== diffOutput) {
+        core3.info(`[PR-Description] using summarized diff for prompt (original length=${diffOutput.length}, summarized length=${diffForPrompt.length})`);
+      }
+      const content = await this.aiHelper.generatePullRequestContent(diffForPrompt, { currentTitle, creator, rules: this.rules });
       core3.info("[PR] AI generation completed!");
       core3.info(`[PR] AI title length: titleLength=${content.title.length}`);
       core3.info(`[PR] AI PR title before formatting: ${content.title}`);

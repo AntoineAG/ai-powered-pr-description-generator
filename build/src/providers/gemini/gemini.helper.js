@@ -97,6 +97,24 @@ class GeminiAIHelper {
                     parsed = null;
                 }
             }
+            // If still unparsed and we see a very high thoughts/output ratio, retry once with a larger maxOutputTokens.
+            if (!parsed && diag.thoughtsRatio > 0.9) {
+                const bumped = Math.min(Math.ceil(maxOutputTokens * 1.5), 4096);
+                this.logger.info(`[AI][Gemini] High thoughts/output ratio with unparsed output; retry maxOutputTokens=${bumped}`);
+                const retryOutcomeHighTokens = await (0, retry_1.generateWithRetry)(async (activeModelName) => {
+                    const model = this.cache.getOrBuild(activeModelName);
+                    const rp = (0, prompt_builder_1.buildGenerateRequest)({ userText, temperature, maxOutputTokens: bumped });
+                    return model.generateContent(rp);
+                }, { logger: this.logger, provider: 'Gemini', initialModel: retryOutcome.modelUsed, retry: this.config.retry });
+                const retryRespHighTokens = retryOutcomeHighTokens.value.response;
+                text = this.concatCandidatePartsText(retryRespHighTokens);
+                try {
+                    parsed = this.parseUnifiedContent(text);
+                }
+                catch (_) {
+                    parsed = null;
+                }
+            }
             // If still unparsed (likely truncated JSON), attempt a JSON-mode tail continuation.
             // If that also fails, fall back to a plain-text description instead of failing the action.
             if (!parsed) {

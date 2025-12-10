@@ -430,8 +430,11 @@ class PullRequestUpdater {
       core.startGroup('AI Generation');
       core.info('[PR] calling AI to generate title and description...');
       const currentTitle = prCtx.title || '';
-      //const diffForPrompt = diffOutput.length > 50000 ? this.buildDiffSummary(changedFiles, diffOutput) : diffOutput;
-      const content = await this.aiHelper.generatePullRequestContent(diffOutput, { currentTitle, creator, rules: this.rules });
+      const diffForPrompt = diffOutput.length > 50000 ? this.buildDiffSummary(changedFiles, diffOutput) : diffOutput;
+      if (diffForPrompt !== diffOutput) {
+        core.info(`[PR-Description] using summarized diff for prompt (original length=${diffOutput.length}, summarized length=${diffForPrompt.length})`);
+      }
+      const content = await this.aiHelper.generatePullRequestContent(diffForPrompt, { currentTitle, creator, rules: this.rules });
       core.info('[PR] AI generation completed!');
       core.info(`[PR] AI title length: titleLength=${content.title.length}`);
       core.info(`[PR] AI PR title before formatting: ${content.title}`);
